@@ -1,0 +1,17 @@
+{
+  "name": "dota2-fearless-draft",
+  "version": "2.0.0",
+  "description": "Dota 2 Fearless Draft — мультиплеерный драфт героев через интернет",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["dota2", "draft", "fearless", "multiplayer", "websocket"],
+  "license": "MIT"
+}
