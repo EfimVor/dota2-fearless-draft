@@ -1,5 +1,5 @@
 /**
- * Dota 2 — Fearless Draft Client (v3 — исправлена инициализация captains)
+ * Dota 2 — Fearless Draft Client (v4 — капитаны не сбрасываются)
  * Мультиплеер через WebSocket. Таймеры 30с + 2:10 резерв.
  */
 
@@ -56,22 +56,26 @@ function handleServerMessage(msg) {
             roomCode=msg.roomCode; serverCaptains=msg.captains||{radiant:null,dire:null};
             document.getElementById('roomCodeDisplay').textContent=roomCode;
             document.getElementById('connInfo').style.display='flex';
-            if(msg.state){isRemoteAction=true;deserializeState(msg.state);isRemoteAction=false;syncLocalCaptainsFromServer();renderAll();updateUI();}
+            // При первом входе синхронизируем капитанов (но не перезаписываем локальных)
+            syncCaptainsFromServer();
+            if(msg.state){isRemoteAction=true;deserializeState(msg.state);isRemoteAction=false;renderAll();updateUI();}
             updateConnectionStatus('connected',`Комната ${roomCode}`);
             showToast(msg.type==='ROOM_CREATED'?'Комната создана! Отправьте код сопернику.':'Подключились к комнате!','success');
             break;
         case 'CAPTAIN_CLAIMED':
-            serverCaptains[msg.team]=msg.name; syncLocalCaptainsFromServer(); renderCaptainBar();
+            serverCaptains[msg.team]=msg.name; syncCaptainsFromServer(); renderCaptainBar();
             showToast(`${msg.name} стал капитаном ${msg.team==='radiant'?'Radiant':'Dire'}!`,'info');
             break;
-        case 'CAPTAIN_LEFT': serverCaptains[msg.team]=null; syncLocalCaptainsFromServer(); renderCaptainBar(); break;
+        case 'CAPTAIN_LEFT': serverCaptains[msg.team]=null; syncCaptainsFromServer(); renderCaptainBar(); break;
         case 'STATE_SYNC':
-            serverCaptains=msg.captains||serverCaptains; syncLocalCaptainsFromServer();
+            serverCaptains=msg.captains||serverCaptains;
+            // Не перезаписываем локальных капитанов
             if(msg.state){isRemoteAction=true;deserializeState(msg.state);isRemoteAction=false;renderAll();updateUI();}
             break;
         case 'GAME_ACTION':
             isRemoteAction=true; handleRemoteAction(msg.action); isRemoteAction=false;
-            if(msg.captains){serverCaptains=msg.captains;syncLocalCaptainsFromServer();} renderAll(); updateUI();
+            if(msg.captains){serverCaptains=msg.captains;}
+            renderAll(); updateUI();
             break;
         case 'PLAYER_JOINED': showToast('Игрок подключился к комнате','info'); break;
         case 'PLAYER_LEFT': showToast('Игрок отключился','info'); break;
@@ -90,7 +94,29 @@ function createRoom(){sendMessage({type:'CREATE_ROOM'});}
 function joinRoom(code){if(!code){code=document.getElementById('joinRoomInput').value.trim();}if(!code||code.length!==6){showToast('Введите 6-значный код комнаты','error');return;}sendMessage({type:'JOIN_ROOM',roomCode:code});const newUrl=new URL(location);newUrl.searchParams.set('room',code);history.replaceState({},'',newUrl);}
 function copyInviteLink(){if(!roomCode)return;const link=`${location.origin}${location.pathname}?room=${roomCode}`;navigator.clipboard.writeText(link).then(()=>{showToast('Ссылка скопирована! Отправьте её сопернику.','success');}).catch(()=>{const helper=document.getElementById('copyHelper');helper.value=link;helper.select();document.execCommand('copy');showToast('Ссылка скопирована!','success');});}
 
-// ==================== GAME STATE ====================
+// ==================== CAPTAINS (отдельно от игрового состояния) ====================
+let captains = {radiant:null,dire:null}; // {name, id} или null
+
+function syncCaptainsFromServer() {
+    // Не трогаем локальных капитанов, только обновляем информацию с сервера
+    if (serverCaptains.radiant && (!captains.radiant || captains.radiant.id !== 'local')) {
+        captains.radiant = {name: serverCaptains.radiant, id: 'remote'};
+    } else if (!serverCaptains.radiant && captains.radiant && captains.radiant.id !== 'local') {
+        captains.radiant = null;
+    }
+    if (serverCaptains.dire && (!captains.dire || captains.dire.id !== 'local')) {
+        captains.dire = {name: serverCaptains.dire, id: 'remote'};
+    } else if (!serverCaptains.dire && captains.dire && captains.dire.id !== 'local') {
+        captains.dire = null;
+    }
+}
+
+function isMyCaptain(team) {
+    if (!captains[team]) return true; // нет капитана — свободный доступ
+    return captains[team].id !== 'remote';
+}
+
+// ==================== GAME STATE (без captains) ====================
 function createInitialState(){
     return {
         seriesStarted:false, currentGame:1,
@@ -103,8 +129,7 @@ function createInitialState(){
         radiantScore:0, direScore:0,
         waitingForWinner:false,
         mainTimer:30,
-        reserveTimers:{radiant:130,dire:130},
-        captains:{radiant:null,dire:null}  // ← ВОТ ЭТО ИСПРАВЛЕНИЕ: captains теперь внутри состояния
+        reserveTimers:{radiant:130,dire:130}
     };
 }
 let state = createInitialState();
@@ -121,8 +146,7 @@ function serializeState(){
         radiantScore:state.radiantScore, direScore:state.direScore,
         waitingForWinner:state.waitingForWinner,
         mainTimer:state.mainTimer,
-        reserveTimers:{radiant:state.reserveTimers.radiant,dire:state.reserveTimers.dire},
-        captains:JSON.parse(JSON.stringify(state.captains)) // ← Сохраняем captains
+        reserveTimers:{radiant:state.reserveTimers.radiant,dire:state.reserveTimers.dire}
     };
 }
 
@@ -138,17 +162,6 @@ function deserializeState(s){
     state.direScore=s.direScore; state.waitingForWinner=s.waitingForWinner;
     state.mainTimer=s.mainTimer!==undefined?s.mainTimer:30;
     state.reserveTimers=s.reserveTimers||{radiant:130,dire:130};
-    state.captains=s.captains||{radiant:null,dire:null}; // ← Восстанавливаем captains
-    syncLocalCaptainsFromServer(); // ← И сразу подтягиваем серверных капитанов
-}
-
-function syncLocalCaptainsFromServer(){
-    // Гарантируем, что captains существует
-    if(!state.captains) state.captains = {radiant:null,dire:null};
-    if(serverCaptains.radiant) state.captains.radiant = {name:serverCaptains.radiant,id:'remote'};
-    else state.captains.radiant = null;
-    if(serverCaptains.dire) state.captains.dire = {name:serverCaptains.dire,id:'remote'};
-    else state.captains.dire = null;
 }
 
 // ==================== TIMER ====================
@@ -159,7 +172,7 @@ function startTurnTimer(team) {
     updateTimerDisplay();
     if (!state.seriesStarted || state.phase === 'complete' || state.waitingForWinner) return;
     const isOurTurn = state.currentTurn === team;
-    const isLocalCaptain = !state.captains[team] || state.captains[team].id === 'local';
+    const isLocalCaptain = !captains[team] || captains[team].id === 'local';
     if (!isOurTurn || !isLocalCaptain) return;
     turnTimerInterval = setInterval(() => {
         if (state.phase === 'complete' || state.waitingForWinner) { stopTurnTimer(); return; }
@@ -236,80 +249,462 @@ function getBanStepTeam(s){return config.banOrder[s]||(s%2===0?'radiant':'dire')
 function getPickStepTeam(s){return config.pickOrder[s]||(s%2===0?'radiant':'dire');}
 function totalBans(){return config.bansPerTeam*2;}
 function totalPicks(){return config.picksPerTeam*2;}
-function isMyCaptain(team){if(!state.captains||!state.captains[team])return true;return state.captains[team].id!=='remote';}
 
 // ==================== GAME ACTIONS ====================
 function claimCaptain(team){if(!roomCode){showToast('Сначала подключитесь к комнате!','error');return;}if(serverCaptains[team]){showToast(`Капитан ${team==='radiant'?'Radiant':'Dire'} уже выбран!`,'error');return;}pendingCaptainTeam=team;document.getElementById('captainNameModal').classList.remove('hidden');document.getElementById('captainNameInput').value='';document.getElementById('captainNameInput').focus();}
 let pendingCaptainTeam=null;
 
-function confirmCaptainName(){const input=document.getElementById('captainNameInput');const name=input.value.trim()||`Капитан ${pendingCaptainTeam==='radiant'?'Radiant':'Dire'}`;const team=pendingCaptainTeam;document.getElementById('captainNameModal').classList.add('hidden');pendingCaptainTeam=null;state.captains[team]={name,id:'local'};sendMessage({type:'CLAIM_CAPTAIN',team,name});serverCaptains[team]=name;renderCaptainBar();updateUI();showToast(`Вы стали капитаном ${team==='radiant'?'Radiant':'Dire'}!`,'success');}
-function leaveCaptain(team){if(state.captains[team]&&state.captains[team].id==='remote')return;state.captains[team]=null;sendMessage({type:'LEAVE_CAPTAIN',team});serverCaptains[team]=null;renderCaptainBar();updateUI();}
+function confirmCaptainName(){const input=document.getElementById('captainNameInput');const name=input.value.trim()||`Капитан ${pendingCaptainTeam==='radiant'?'Radiant':'Dire'}`;const team=pendingCaptainTeam;document.getElementById('captainNameModal').classList.add('hidden');pendingCaptainTeam=null;captains[team]={name,id:'local'};sendMessage({type:'CLAIM_CAPTAIN',team,name});serverCaptains[team]=name;renderCaptainBar();updateUI();showToast(`Вы стали капитаном ${team==='radiant'?'Radiant':'Dire'}!`,'success');}
+function leaveCaptain(team){if(captains[team]&&captains[team].id==='remote')return;captains[team]=null;sendMessage({type:'LEAVE_CAPTAIN',team});serverCaptains[team]=null;renderCaptainBar();updateUI();}
 
-function startNewSeries(){state=createInitialState();state.seriesStarted=true;state.availableHeroes=generateHeroPool();state.phase='ban';state.step=0;state.currentTurn=config.banOrder[0];renderAll();updateUI();broadcastAction({type:'new_series',serializedState:serializeState()});syncGameState();showToast('Новая серия началась! ⚔️ Фаза банов','success');}
-function applyNewSeriesLocally(ss){if(ss){deserializeState(ss);}else{state=createInitialState();state.seriesStarted=true;state.availableHeroes=generateHeroPool();state.phase='ban';state.step=0;state.currentTurn=config.banOrder[0];}renderAll();updateUI();}
+function startNewSeries(){
+    const savedCaptains = captains; // сохраняем текущих капитанов
+    state = createInitialState();
+    state.seriesStarted = true;
+    state.availableHeroes = generateHeroPool();
+    state.phase = 'ban'; state.step = 0; state.currentTurn = config.banOrder[0];
+    // captains не трогаем — они остаются глобальными
+    renderAll(); updateUI();
+    broadcastAction({type:'new_series', serializedState: serializeState()});
+    syncGameState();
+    showToast('Новая серия началась! ⚔️ Фаза банов','success');
+}
 
-function banHero(hero,attribute){if(state.phase!=='ban'){showToast('Сейчас фаза пиков!','error');return;}if(!state.seriesStarted){showToast('Начните новую серию!','error');return;}if(state.waitingForWinner)return;const pool=state.availableHeroes[attribute];if(!pool||!pool.includes(hero)){showToast('Герой недоступен!','error');return;}const team=getBanStepTeam(state.step);if(state.bans[team].length>=config.bansPerTeam){showToast('Команда сделала все баны!','error');return;}if(!isMyCaptain(team)){showToast('Это не ваш бан!','error');return;}applyBanLocally(hero,attribute,team);broadcastAction({type:'ban',hero,attribute,team});syncGameState();}
-function applyBanLocally(hero,attribute,team){state.currentGameBans.push({hero,attribute,team});state.bans[team].push(hero);state.availableHeroes[attribute]=state.availableHeroes[attribute].filter(h=>h!==hero);state.step++;if(state.step>=totalBans()){state.phase='pick';state.step=0;state.currentTurn=config.pickOrder[0];}else{state.currentTurn=getBanStepTeam(state.step);}state.mainTimer=30;renderAll();updateUI();startTurnTimer(state.currentTurn);}
+function applyNewSeriesLocally(ss){
+    if(ss){deserializeState(ss);}
+    else{
+        state = createInitialState();
+        state.seriesStarted = true;
+        state.availableHeroes = generateHeroPool();
+        state.phase = 'ban'; state.step = 0; state.currentTurn = config.banOrder[0];
+    }
+    renderAll(); updateUI();
+}
 
-function pickHero(hero,attribute){if(state.phase!=='pick'){showToast('Сейчас фаза банов!','error');return;}if(!state.seriesStarted){showToast('Начните новую серию!','error');return;}if(state.waitingForWinner)return;const pool=state.availableHeroes[attribute];if(!pool||!pool.includes(hero)){showToast('Герой недоступен!','error');return;}const team=getPickStepTeam(state.step);if(state.picks[team].length>=config.picksPerTeam){showToast('Команда набрала всех героев!','error');return;}if(!isMyCaptain(team)){showToast('Это не ваш пик!','error');return;}applyPickLocally(hero,attribute,team);broadcastAction({type:'pick',hero,attribute,team});syncGameState();}
-function applyPickLocally(hero,attribute,team){state.currentGamePicks.push({hero,attribute,team});state.picks[team].push(hero);state.availableHeroes[attribute]=state.availableHeroes[attribute].filter(h=>h!==hero);state.step++;if(state.step>=totalPicks()){state.phase='complete';state.waitingForWinner=true;stopTurnTimer();}else{state.currentTurn=getPickStepTeam(state.step);state.mainTimer=30;}renderAll();updateUI();if(!state.waitingForWinner)startTurnTimer(state.currentTurn);checkSkipFullTeam();}
-function checkSkipFullTeam(){const team=state.currentTurn;if(state.picks[team].length>=config.picksPerTeam){state.step++;if(state.step>=totalPicks()){state.phase='complete';state.waitingForWinner=true;stopTurnTimer();}else{state.currentTurn=getPickStepTeam(state.step);state.mainTimer=30;}renderAll();updateUI();if(!state.waitingForWinner)startTurnTimer(state.currentTurn);checkSkipFullTeam();}}
+function banHero(hero,attribute){
+    if(state.phase!=='ban'){showToast('Сейчас фаза пиков!','error');return;}
+    if(!state.seriesStarted){showToast('Начните новую серию!','error');return;}
+    if(state.waitingForWinner)return;
+    const pool=state.availableHeroes[attribute];
+    if(!pool||!pool.includes(hero)){showToast('Герой недоступен!','error');return;}
+    const team=getBanStepTeam(state.step);
+    if(state.bans[team].length>=config.bansPerTeam){showToast('Команда сделала все баны!','error');return;}
+    if(!isMyCaptain(team)){showToast('Это не ваш бан!','error');return;}
+    applyBanLocally(hero,attribute,team);
+    broadcastAction({type:'ban',hero,attribute,team});
+    syncGameState();
+}
 
-function undoLastAction(){if(!state.seriesStarted)return;if(state.waitingForWinner){showToast('Игра завершена, отмена невозможна.','error');return;}const hasBans=state.currentGameBans.length>0;const hasPicks=state.currentGamePicks.length>0;if(!hasBans&&!hasPicks){showToast('Нечего отменять!','error');return;}applyUndoLocally();broadcastAction({type:'undo'});syncGameState();}
-function applyUndoLocally(){if(state.phase==='pick'&&state.currentGamePicks.length>0){const last=state.currentGamePicks.pop();state.picks[last.team].pop();if(!state.availableHeroes[last.attribute])state.availableHeroes[last.attribute]=[];state.availableHeroes[last.attribute].push(last.hero);state.step--;state.currentTurn=getPickStepTeam(state.step);}else if(state.phase==='ban'&&state.currentGameBans.length>0){const last=state.currentGameBans.pop();state.bans[last.team].pop();if(!state.availableHeroes[last.attribute])state.availableHeroes[last.attribute]=[];state.availableHeroes[last.attribute].push(last.hero);state.step--;state.currentTurn=getBanStepTeam(state.step);}else if(state.phase==='pick'&&state.currentGamePicks.length===0&&state.currentGameBans.length>0){const last=state.currentGameBans.pop();state.bans[last.team].pop();if(!state.availableHeroes[last.attribute])state.availableHeroes[last.attribute]=[];state.availableHeroes[last.attribute].push(last.hero);state.phase='ban';state.step=totalBans()-1;state.currentTurn=getBanStepTeam(state.step);}state.waitingForWinner=false;hideWinnerModal();state.mainTimer=30;renderAll();updateUI();startTurnTimer(state.currentTurn);showToast('Действие отменено ↩','info');}
+function applyBanLocally(hero,attribute,team){
+    state.currentGameBans.push({hero,attribute,team});
+    state.bans[team].push(hero);
+    state.availableHeroes[attribute]=state.availableHeroes[attribute].filter(h=>h!==hero);
+    state.step++;
+    if(state.step>=totalBans()){
+        state.phase='pick'; state.step=0; state.currentTurn=config.pickOrder[0];
+    }else{
+        state.currentTurn=getBanStepTeam(state.step);
+    }
+    state.mainTimer=30;
+    renderAll(); updateUI();
+    startTurnTimer(state.currentTurn);
+}
 
-function nextGame(){if(state.waitingForWinner){showToast('Сначала укажите победителя!','error');return;}applyNextGameLocally();broadcastAction({type:'next_game'});syncGameState();}
-function applyNextGameLocally(){const gr={gameNumber:state.currentGame,bans:JSON.parse(JSON.stringify(state.bans)),picks:JSON.parse(JSON.stringify(state.picks)),winner:null};state.currentGamePicks.forEach(p=>{if(!state.seriesBannedHeroes.includes(p.hero))state.seriesBannedHeroes.push(p.hero);});state.seriesHistory.push(gr);state.currentGame++;state.bans={radiant:[],dire:[]};state.picks={radiant:[],dire:[]};state.currentGameBans=[];state.currentGamePicks=[];state.phase='ban';state.step=0;state.currentTurn=config.banOrder[0];state.waitingForWinner=false;state.mainTimer=30;state.reserveTimers={radiant:130,dire:130};state.availableHeroes=generateHeroPool();renderAll();updateUI();showToast(`Игра ${state.currentGame} началась! Фаза банов`,'info');}
+function pickHero(hero,attribute){
+    if(state.phase!=='pick'){showToast('Сейчас фаза банов!','error');return;}
+    if(!state.seriesStarted){showToast('Начните новую серию!','error');return;}
+    if(state.waitingForWinner)return;
+    const pool=state.availableHeroes[attribute];
+    if(!pool||!pool.includes(hero)){showToast('Герой недоступен!','error');return;}
+    const team=getPickStepTeam(state.step);
+    if(state.picks[team].length>=config.picksPerTeam){showToast('Команда набрала всех героев!','error');return;}
+    if(!isMyCaptain(team)){showToast('Это не ваш пик!','error');return;}
+    applyPickLocally(hero,attribute,team);
+    broadcastAction({type:'pick',hero,attribute,team});
+    syncGameState();
+}
 
-function setGameWinner(winner){if(!state.waitingForWinner)return;applyWinnerLocally(winner);broadcastAction({type:'set_winner',winner});syncGameState();}
-function applyWinnerLocally(winner){if(state.seriesHistory.length>0){const last=state.seriesHistory[state.seriesHistory.length-1];if(!last.winner&&last.gameNumber===state.currentGame-1){last.winner=winner;}else{addGameRecord(winner);}}else{addGameRecord(winner);}if(winner==='radiant')state.radiantScore++;else if(winner==='dire')state.direScore++;state.waitingForWinner=false;hideWinnerModal();renderAll();updateUI();showToast(`${winner==='radiant'?'Radiant':'Dire'} победили! 🏆`,'success');}
-function addGameRecord(winner){state.seriesHistory.push({gameNumber:state.currentGame,bans:JSON.parse(JSON.stringify(state.bans)),picks:JSON.parse(JSON.stringify(state.picks)),winner});}
-function skipWinner(){if(!state.waitingForWinner)return;state.waitingForWinner=false;hideWinnerModal();updateUI();showToast('Победитель не указан.','info');}
+function applyPickLocally(hero,attribute,team){
+    state.currentGamePicks.push({hero,attribute,team});
+    state.picks[team].push(hero);
+    state.availableHeroes[attribute]=state.availableHeroes[attribute].filter(h=>h!==hero);
+    state.step++;
+    if(state.step>=totalPicks()){
+        state.phase='complete'; state.waitingForWinner=true;
+        stopTurnTimer();
+    }else{
+        state.currentTurn=getPickStepTeam(state.step);
+        state.mainTimer=30;
+    }
+    renderAll(); updateUI();
+    if(!state.waitingForWinner) startTurnTimer(state.currentTurn);
+    checkSkipFullTeam();
+}
+
+function checkSkipFullTeam(){
+    const team=state.currentTurn;
+    if(state.picks[team].length>=config.picksPerTeam){
+        state.step++;
+        if(state.step>=totalPicks()){
+            state.phase='complete'; state.waitingForWinner=true;
+            stopTurnTimer();
+        }else{
+            state.currentTurn=getPickStepTeam(state.step);
+            state.mainTimer=30;
+        }
+        renderAll(); updateUI();
+        if(!state.waitingForWinner) startTurnTimer(state.currentTurn);
+        checkSkipFullTeam();
+    }
+}
+
+function undoLastAction(){
+    if(!state.seriesStarted)return;
+    if(state.waitingForWinner){showToast('Игра завершена, отмена невозможна.','error');return;}
+    const hasBans=state.currentGameBans.length>0;
+    const hasPicks=state.currentGamePicks.length>0;
+    if(!hasBans&&!hasPicks){showToast('Нечего отменять!','error');return;}
+    applyUndoLocally();
+    broadcastAction({type:'undo'});
+    syncGameState();
+}
+
+function applyUndoLocally(){
+    if(state.phase==='pick'&&state.currentGamePicks.length>0){
+        const last=state.currentGamePicks.pop();
+        state.picks[last.team].pop();
+        if(!state.availableHeroes[last.attribute])state.availableHeroes[last.attribute]=[];
+        state.availableHeroes[last.attribute].push(last.hero);
+        state.step--;
+        state.currentTurn=getPickStepTeam(state.step);
+    }else if(state.phase==='ban'&&state.currentGameBans.length>0){
+        const last=state.currentGameBans.pop();
+        state.bans[last.team].pop();
+        if(!state.availableHeroes[last.attribute])state.availableHeroes[last.attribute]=[];
+        state.availableHeroes[last.attribute].push(last.hero);
+        state.step--;
+        state.currentTurn=getBanStepTeam(state.step);
+    }else if(state.phase==='pick'&&state.currentGamePicks.length===0&&state.currentGameBans.length>0){
+        const last=state.currentGameBans.pop();
+        state.bans[last.team].pop();
+        if(!state.availableHeroes[last.attribute])state.availableHeroes[last.attribute]=[];
+        state.availableHeroes[last.attribute].push(last.hero);
+        state.phase='ban'; state.step=totalBans()-1; state.currentTurn=getBanStepTeam(state.step);
+    }
+    state.waitingForWinner=false; hideWinnerModal();
+    state.mainTimer=30;
+    renderAll(); updateUI();
+    startTurnTimer(state.currentTurn);
+    showToast('Действие отменено ↩','info');
+}
+
+function nextGame(){
+    if(state.waitingForWinner){showToast('Сначала укажите победителя!','error');return;}
+    applyNextGameLocally();
+    broadcastAction({type:'next_game'});
+    syncGameState();
+}
+
+function applyNextGameLocally(){
+    const gr={gameNumber:state.currentGame,bans:JSON.parse(JSON.stringify(state.bans)),picks:JSON.parse(JSON.stringify(state.picks)),winner:null};
+    state.currentGamePicks.forEach(p=>{if(!state.seriesBannedHeroes.includes(p.hero))state.seriesBannedHeroes.push(p.hero);});
+    state.seriesHistory.push(gr);
+    state = createInitialState();
+    state.currentGame = gr.gameNumber + 1;
+    state.bans={radiant:[],dire:[]}; state.picks={radiant:[],dire:[]};
+    state.currentGameBans=[]; state.currentGamePicks=[];
+    state.phase='ban'; state.step=0; state.currentTurn=config.banOrder[0];
+    state.waitingForWinner=false; state.mainTimer=30;
+    state.reserveTimers={radiant:130,dire:130};
+    state.seriesBannedHeroes = [...state.seriesBannedHeroes]; // сохраняем
+    state.availableHeroes=generateHeroPool();
+    renderAll(); updateUI();
+    showToast(`Игра ${state.currentGame} началась! Фаза банов`,'info');
+}
+
+function setGameWinner(winner){
+    if(!state.waitingForWinner)return;
+    applyWinnerLocally(winner);
+    broadcastAction({type:'set_winner',winner});
+    syncGameState();
+}
+
+function applyWinnerLocally(winner){
+    if(state.seriesHistory.length>0){
+        const last=state.seriesHistory[state.seriesHistory.length-1];
+        if(!last.winner&&last.gameNumber===state.currentGame-1){last.winner=winner;}
+        else{addGameRecord(winner);}
+    }else{addGameRecord(winner);}
+    if(winner==='radiant')state.radiantScore++;else if(winner==='dire')state.direScore++;
+    state.waitingForWinner=false; hideWinnerModal();
+    renderAll(); updateUI();
+    showToast(`${winner==='radiant'?'Radiant':'Dire'} победили! 🏆`,'success');
+}
+
+function addGameRecord(winner){
+    state.seriesHistory.push({gameNumber:state.currentGame,bans:JSON.parse(JSON.stringify(state.bans)),picks:JSON.parse(JSON.stringify(state.picks)),winner});
+}
+
+function skipWinner(){
+    if(!state.waitingForWinner)return;
+    state.waitingForWinner=false; hideWinnerModal(); updateUI();
+    showToast('Победитель не указан.','info');
+}
 
 // ==================== RENDER ====================
-function renderAll(){renderHeroPool();renderTeamBans('radiant');renderTeamBans('dire');renderTeamPicks('radiant');renderTeamPicks('dire');updateAttrCounts();updateGameBadge();updatePhaseBadge();updateScoreDisplay();renderCaptainBar();updateButtons();updateTimerDisplay();}
+function renderAll(){
+    renderHeroPool();
+    renderTeamBans('radiant'); renderTeamBans('dire');
+    renderTeamPicks('radiant'); renderTeamPicks('dire');
+    updateAttrCounts(); updateGameBadge(); updatePhaseBadge();
+    updateScoreDisplay(); renderCaptainBar(); updateButtons(); updateTimerDisplay();
+}
 
-function renderHeroPool(){const grids={strength:'strengthGrid',agility:'agilityGrid',intelligence:'intelligenceGrid',universal:'universalGrid'};for(const[attr,gridId]of Object.entries(grids)){const grid=document.getElementById(gridId);if(!grid)continue;const heroes=state.availableHeroes[attr]||[];grid.innerHTML='';if(!state.seriesStarted){grid.innerHTML='<div class="text-muted" style="grid-column:1/-1;padding:16px;font-size:0.7rem;">Начните серию</div>';continue;}if(heroes.length===0){grid.innerHTML='<div class="text-muted" style="grid-column:1/-1;padding:16px;font-size:0.7rem;">Нет героев</div>';continue;}heroes.forEach(hero=>{const card=document.createElement('div');const isBanned=state.currentGameBans.some(b=>b.hero===hero);const isPicked=state.currentGamePicks.some(p=>p.hero===hero);const isSeriesBanned=state.seriesBannedHeroes.includes(hero);let cls=`hero-card ${attr}`;if(isSeriesBanned)cls+=' series-banned';else if(isPicked)cls+=' picked';else if(isBanned)cls+=' banned';card.className=cls;const imgUrl=getHeroImageUrl(hero);if(imgUrl)card.style.backgroundImage=`url(${imgUrl})`;else card.style.backgroundColor=getAttrBg(attr);let inner=`<div class="hero-info"><span class="hero-name">${hero}</span><span class="hero-attr-badge">${getAttrLabel(attr)}</span></div>`;if(isBanned&&!isSeriesBanned&&!isPicked)inner+='<span class="banned-overlay">🚫</span>';card.innerHTML=inner;if(!isSeriesBanned&&!isPicked){if(state.phase==='ban'&&!isBanned)card.onclick=()=>banHero(hero,attr);else if(state.phase==='pick'&&!isBanned)card.onclick=()=>pickHero(hero,attr);}grid.appendChild(card);});const needed=config.heroesPerAttribute-heroes.length;for(let i=0;i<needed;i++){const e=document.createElement('div');e.className='hero-card series-banned';e.innerHTML='<div class="hero-info"><span class="hero-name" style="color:#333;">Заблокирован</span></div>';grid.appendChild(e);}}}
+function renderHeroPool(){
+    const grids={strength:'strengthGrid',agility:'agilityGrid',intelligence:'intelligenceGrid',universal:'universalGrid'};
+    for(const[attr,gridId]of Object.entries(grids)){
+        const grid=document.getElementById(gridId); if(!grid)continue;
+        const heroes=state.availableHeroes[attr]||[]; grid.innerHTML='';
+        if(!state.seriesStarted){grid.innerHTML='<div class="text-muted" style="grid-column:1/-1;padding:16px;font-size:0.7rem;">Начните серию</div>';continue;}
+        if(heroes.length===0){grid.innerHTML='<div class="text-muted" style="grid-column:1/-1;padding:16px;font-size:0.7rem;">Нет героев</div>';continue;}
+        heroes.forEach(hero=>{
+            const card=document.createElement('div');
+            const isBanned=state.currentGameBans.some(b=>b.hero===hero);
+            const isPicked=state.currentGamePicks.some(p=>p.hero===hero);
+            const isSeriesBanned=state.seriesBannedHeroes.includes(hero);
+            let cls=`hero-card ${attr}`;
+            if(isSeriesBanned)cls+=' series-banned';
+            else if(isPicked)cls+=' picked';
+            else if(isBanned)cls+=' banned';
+            card.className=cls;
+            const imgUrl=getHeroImageUrl(hero);
+            if(imgUrl)card.style.backgroundImage=`url(${imgUrl})`;
+            else card.style.backgroundColor=getAttrBg(attr);
+            let inner=`<div class="hero-info"><span class="hero-name">${hero}</span><span class="hero-attr-badge">${getAttrLabel(attr)}</span></div>`;
+            if(isBanned&&!isSeriesBanned&&!isPicked)inner+='<span class="banned-overlay">🚫</span>';
+            card.innerHTML=inner;
+            if(!isSeriesBanned&&!isPicked){
+                if(state.phase==='ban'&&!isBanned)card.onclick=()=>banHero(hero,attr);
+                else if(state.phase==='pick'&&!isBanned)card.onclick=()=>pickHero(hero,attr);
+            }
+            grid.appendChild(card);
+        });
+        const needed=config.heroesPerAttribute-heroes.length;
+        for(let i=0;i<needed;i++){
+            const e=document.createElement('div'); e.className='hero-card series-banned';
+            e.innerHTML='<div class="hero-info"><span class="hero-name" style="color:#333;">Заблокирован</span></div>';
+            grid.appendChild(e);
+        }
+    }
+}
 
-function renderTeamBans(team){const c=document.getElementById(`${team}BanSlots`);if(!c)return;const bans=state.bans[team]||[];c.innerHTML='';for(let i=0;i<config.bansPerTeam;i++){const s=document.createElement('div');s.className='ban-slot'+(i<bans.length?' filled':' empty');s.textContent=i<bans.length?bans[i]:'—';if(i<bans.length)s.title=bans[i];c.appendChild(s);}}
-function renderTeamPicks(team){const c=document.getElementById(`${team}Picks`);if(!c)return;const picks=state.picks[team]||[];c.innerHTML='';for(let i=0;i<config.picksPerTeam;i++){const s=document.createElement('div');s.className='pick-slot';if(i<picks.length){s.className+=` filled ${team}-pick`;const u=getHeroImageUrl(picks[i]);if(u)s.style.backgroundImage=`url(${u})`;s.innerHTML=`<span>${picks[i]}</span>`;s.title=picks[i];}else{s.className+=' empty';s.textContent='ПУСТО';}s.dataset.slot=`${team}-${i}`;c.appendChild(s);}}
+function renderTeamBans(team){
+    const c=document.getElementById(`${team}BanSlots`); if(!c)return;
+    const bans=state.bans[team]||[]; c.innerHTML='';
+    for(let i=0;i<config.bansPerTeam;i++){
+        const s=document.createElement('div'); s.className='ban-slot'+(i<bans.length?' filled':' empty');
+        s.textContent=i<bans.length?bans[i]:'—'; if(i<bans.length)s.title=bans[i];
+        c.appendChild(s);
+    }
+}
+
+function renderTeamPicks(team){
+    const c=document.getElementById(`${team}Picks`); if(!c)return;
+    const picks=state.picks[team]||[]; c.innerHTML='';
+    for(let i=0;i<config.picksPerTeam;i++){
+        const s=document.createElement('div'); s.className='pick-slot';
+        if(i<picks.length){
+            s.className+=` filled ${team}-pick`;
+            const u=getHeroImageUrl(picks[i]);
+            if(u)s.style.backgroundImage=`url(${u})`;
+            s.innerHTML=`<span>${picks[i]}</span>`; s.title=picks[i];
+        }else{
+            s.className+=' empty'; s.textContent='ПУСТО';
+        }
+        s.dataset.slot=`${team}-${i}`; c.appendChild(s);
+    }
+}
 
 function renderCaptainBar(){
-    if(!state.captains) state.captains = {radiant:null,dire:null};
     const rE=document.getElementById('radiantCaptainEmpty'),rF=document.getElementById('radiantCaptainFilled'),rN=document.getElementById('radiantCaptainName');
     const dE=document.getElementById('direCaptainEmpty'),dF=document.getElementById('direCaptainFilled'),dN=document.getElementById('direCaptainName');
-    if(state.captains.radiant){rE.classList.add('hidden');rF.classList.remove('hidden');rN.textContent=state.captains.radiant.name;}
+    if(captains.radiant){rE.classList.add('hidden');rF.classList.remove('hidden');rN.textContent=captains.radiant.name;}
     else{rE.classList.remove('hidden');rF.classList.add('hidden');}
-    if(state.captains.dire){dE.classList.add('hidden');dF.classList.remove('hidden');dN.textContent=state.captains.dire.name;}
+    if(captains.dire){dE.classList.add('hidden');dF.classList.remove('hidden');dN.textContent=captains.dire.name;}
     else{dE.classList.remove('hidden');dF.classList.add('hidden');}
 }
 
-function updateAttrCounts(){const m={strCount:'strength',agiCount:'agility',intCount:'intelligence',uniCount:'universal'};for(const[id,attr]of Object.entries(m)){const e=document.getElementById(id);if(e)e.textContent=`${(state.availableHeroes[attr]||[]).length}/${config.heroesPerAttribute}`;}}
+function updateAttrCounts(){
+    const m={strCount:'strength',agiCount:'agility',intCount:'intelligence',uniCount:'universal'};
+    for(const[id,attr]of Object.entries(m)){
+        const e=document.getElementById(id); if(e)e.textContent=`${(state.availableHeroes[attr]||[]).length}/${config.heroesPerAttribute}`;
+    }
+}
+
 function updateGameBadge(){document.getElementById('gameBadge').textContent=`Игра ${state.currentGame}`;}
-function updatePhaseBadge(){const b=document.getElementById('phaseBadge');if(!state.seriesStarted){b.textContent='Ожидание';b.className='phase-badge waiting';return;}if(state.phase==='ban'){b.textContent='Фаза банов';b.className='phase-badge ban-phase';}else if(state.phase==='pick'){b.textContent='Фаза пиков';b.className='phase-badge pick-phase';}else{b.textContent='Завершено';b.className='phase-badge complete';}}
-function updateScoreDisplay(){document.getElementById('radiantScore').textContent=state.radiantScore;document.getElementById('direScore').textContent=state.direScore;}
+function updatePhaseBadge(){
+    const b=document.getElementById('phaseBadge');
+    if(!state.seriesStarted){b.textContent='Ожидание';b.className='phase-badge waiting';return;}
+    if(state.phase==='ban'){b.textContent='Фаза банов';b.className='phase-badge ban-phase';}
+    else if(state.phase==='pick'){b.textContent='Фаза пиков';b.className='phase-badge pick-phase';}
+    else{b.textContent='Завершено';b.className='phase-badge complete';}
+}
 
-function updateUI(){updateTurnDisplay();updateButtons();updateGameBadge();updatePhaseBadge();updateScoreDisplay();updateTimerDisplay();}
+function updateScoreDisplay(){
+    document.getElementById('radiantScore').textContent=state.radiantScore;
+    document.getElementById('direScore').textContent=state.direScore;
+}
 
-function updateTurnDisplay(){const rT=document.getElementById('radiantTurn'),dT=document.getElementById('direTurn'),tI=document.getElementById('turnInfo');if(!state.seriesStarted){rT?.classList.add('hidden');dT?.classList.add('hidden');if(tI){tI.textContent='Подключитесь к комнате для начала';tI.className='turn-info';}resetPanelGlows();return;}if(state.phase==='complete'||state.waitingForWinner){rT?.classList.add('hidden');dT?.classList.add('hidden');if(tI){tI.textContent='Все пики сделаны — выберите победителя';tI.className='turn-info';}resetPanelGlows();return;}const isR=state.currentTurn==='radiant';rT?.classList.toggle('hidden',!isR);dT?.classList.toggle('hidden',isR);const rP=document.getElementById('radiantPanel'),dP=document.getElementById('direPanel');if(rP&&dP){rP.style.boxShadow=isR?'0 0 30px var(--radiant-glow)':'none';dP.style.boxShadow=!isR?'0 0 30px var(--dire-glow)':'none';}startTurnTimer(state.currentTurn);}
-function resetPanelGlows(){const r=document.getElementById('radiantPanel'),d=document.getElementById('direPanel');if(r)r.style.boxShadow='none';if(d)d.style.boxShadow='none';}
-function updateButtons(){const u=document.getElementById('btnUndo'),n=document.getElementById('btnNextGame');const hasA=(state.phase==='ban'&&state.currentGameBans.length>0)||(state.phase==='pick'&&(state.currentGamePicks.length>0||state.currentGameBans.length>0));if(u)u.disabled=!state.seriesStarted||!hasA||state.waitingForWinner;if(n)n.disabled=!state.seriesStarted||state.phase!=='complete'||state.waitingForWinner;}
+function updateUI(){
+    updateTurnDisplay(); updateButtons();
+    updateGameBadge(); updatePhaseBadge(); updateScoreDisplay(); updateTimerDisplay();
+}
+
+function updateTurnDisplay(){
+    const rT=document.getElementById('radiantTurn'),dT=document.getElementById('direTurn'),tI=document.getElementById('turnInfo');
+    if(!state.seriesStarted){
+        rT?.classList.add('hidden'); dT?.classList.add('hidden');
+        if(tI){tI.textContent='Подключитесь к комнате для начала';tI.className='turn-info';}
+        resetPanelGlows(); return;
+    }
+    if(state.phase==='complete'||state.waitingForWinner){
+        rT?.classList.add('hidden'); dT?.classList.add('hidden');
+        if(tI){tI.textContent='Все пики сделаны — выберите победителя';tI.className='turn-info';}
+        resetPanelGlows(); return;
+    }
+    const isR=state.currentTurn==='radiant';
+    rT?.classList.toggle('hidden',!isR); dT?.classList.toggle('hidden',isR);
+    const rP=document.getElementById('radiantPanel'),dP=document.getElementById('direPanel');
+    if(rP&&dP){
+        rP.style.boxShadow=isR?'0 0 30px var(--radiant-glow)':'none';
+        dP.style.boxShadow=!isR?'0 0 30px var(--dire-glow)':'none';
+    }
+    startTurnTimer(state.currentTurn);
+}
+
+function resetPanelGlows(){
+    const r=document.getElementById('radiantPanel'),d=document.getElementById('direPanel');
+    if(r)r.style.boxShadow='none'; if(d)d.style.boxShadow='none';
+}
+
+function updateButtons(){
+    const u=document.getElementById('btnUndo'),n=document.getElementById('btnNextGame');
+    const hasA=(state.phase==='ban'&&state.currentGameBans.length>0)||(state.phase==='pick'&&(state.currentGamePicks.length>0||state.currentGameBans.length>0));
+    if(u)u.disabled=!state.seriesStarted||!hasA||state.waitingForWinner;
+    if(n)n.disabled=!state.seriesStarted||state.phase!=='complete'||state.waitingForWinner;
+}
 
 // ==================== MODALS ====================
 function showWinnerModal(){document.getElementById('winnerModal')?.classList.remove('hidden');document.getElementById('winnerGameNum').textContent=state.currentGame;}
 function hideWinnerModal(){document.getElementById('winnerModal')?.classList.add('hidden');}
-function showSettingsModal(){document.getElementById('settingHeroesPerAttr').value=config.heroesPerAttribute;document.getElementById('settingBansPerTeam').value=config.bansPerTeam;document.getElementById('settingPicksPerTeam').value=config.picksPerTeam;document.getElementById('settingBanOrder').value=config.banOrder.join(',');document.getElementById('settingPickOrder').value=config.pickOrder.join(',');document.getElementById('settingsModal').classList.remove('hidden');}
+function showSettingsModal(){
+    document.getElementById('settingHeroesPerAttr').value=config.heroesPerAttribute;
+    document.getElementById('settingBansPerTeam').value=config.bansPerTeam;
+    document.getElementById('settingPicksPerTeam').value=config.picksPerTeam;
+    document.getElementById('settingBanOrder').value=config.banOrder.join(',');
+    document.getElementById('settingPickOrder').value=config.pickOrder.join(',');
+    document.getElementById('settingsModal').classList.remove('hidden');
+}
 function hideSettingsModal(){document.getElementById('settingsModal')?.classList.add('hidden');}
-function applySettings(){const hpa=Math.max(5,Math.min(15,parseInt(document.getElementById('settingHeroesPerAttr').value)||10));const bpt=Math.max(1,Math.min(5,parseInt(document.getElementById('settingBansPerTeam').value)||3));const ppt=Math.max(3,Math.min(5,parseInt(document.getElementById('settingPicksPerTeam').value)||5));const bo=(document.getElementById('settingBanOrder').value||'R,D,R,D,R,D').split(',').map(s=>s.trim().toLowerCase());const po=(document.getElementById('settingPickOrder').value||'R,D,D,R,R,D,D,R,R,D').split(',').map(s=>s.trim().toLowerCase());const pt=s=>s==='r'||s==='radiant'?'radiant':s==='d'||s==='dire'?'dire':null;const bo2=bo.map(pt).filter(Boolean),po2=po.map(pt).filter(Boolean);if(bo2.length!==bpt*2){showToast(`Порядок банов: ровно ${bpt*2} элементов!`,'error');return;}if(po2.length!==ppt*2){showToast(`Порядок пиков: ровно ${ppt*2} элементов!`,'error');return;}config.heroesPerAttribute=hpa;config.bansPerTeam=bpt;config.picksPerTeam=ppt;config.banOrder=bo2;config.pickOrder=po2;hideSettingsModal();if(state.seriesStarted)startNewSeries();showToast('Настройки применены!','success');}
+function applySettings(){
+    const hpa=Math.max(5,Math.min(15,parseInt(document.getElementById('settingHeroesPerAttr').value)||10));
+    const bpt=Math.max(1,Math.min(5,parseInt(document.getElementById('settingBansPerTeam').value)||3));
+    const ppt=Math.max(3,Math.min(5,parseInt(document.getElementById('settingPicksPerTeam').value)||5));
+    const bo=(document.getElementById('settingBanOrder').value||'R,D,R,D,R,D').split(',').map(s=>s.trim().toLowerCase());
+    const po=(document.getElementById('settingPickOrder').value||'R,D,D,R,R,D,D,R,R,D').split(',').map(s=>s.trim().toLowerCase());
+    const pt=s=>s==='r'||s==='radiant'?'radiant':s==='d'||s==='dire'?'dire':null;
+    const bo2=bo.map(pt).filter(Boolean),po2=po.map(pt).filter(Boolean);
+    if(bo2.length!==bpt*2){showToast(`Порядок банов: ровно ${bpt*2} элементов!`,'error');return;}
+    if(po2.length!==ppt*2){showToast(`Порядок пиков: ровно ${ppt*2} элементов!`,'error');return;}
+    config.heroesPerAttribute=hpa;config.bansPerTeam=bpt;config.picksPerTeam=ppt;
+    config.banOrder=bo2;config.pickOrder=po2;
+    hideSettingsModal();
+    if(state.seriesStarted)startNewSeries();
+    showToast('Настройки применены!','success');
+}
 
-function showHistoryModal(){const c=document.getElementById('historyContent');if(!c)return;if(state.seriesHistory.length===0&&state.currentGameBans.length===0&&state.currentGamePicks.length===0){c.innerHTML='<p class="text-muted">Серия ещё не начата.</p>';}else{let h='<div style="display:flex;flex-direction:column;gap:14px;">';state.seriesHistory.forEach(g=>{h+=`<div style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><h4 style="margin-bottom:8px;">Игра ${g.gameNumber} ${g.winner==='radiant'?'🏛️ Radiant':g.winner==='dire'?'💀 Dire':''}</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong><div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${g.bans?.radiant?.join(', ')||'—'}</div><div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${g.picks?.radiant?.join(', ')||'—'}</div></div><div><strong style="color:var(--dire-color);">💀 Dire</strong><div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${g.bans?.dire?.join(', ')||'—'}</div><div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${g.picks?.dire?.join(', ')||'—'}</div></div></div></div>`;});if((state.currentGameBans.length>0||state.currentGamePicks.length>0)&&!state.seriesHistory.some(g=>g.gameNumber===state.currentGame)){h+=`<div style="border:1px solid var(--accent-blue);border-radius:8px;padding:12px;opacity:0.8;"><h4 style="margin-bottom:8px;">Игра ${state.currentGame} (текущая)</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong><div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${state.bans.radiant.join(', ')||'—'}</div><div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${state.picks.radiant.join(', ')||'—'}</div></div><div><strong style="color:var(--dire-color);">💀 Dire</strong><div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${state.bans.dire.join(', ')||'—'}</div><div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${state.picks.dire.join(', ')||'—'}</div></div></div></div>`;}h+='</div>';c.innerHTML=h;}document.getElementById('historyModal').classList.remove('hidden');}
+function showHistoryModal(){
+    const c=document.getElementById('historyContent');if(!c)return;
+    if(state.seriesHistory.length===0&&state.currentGameBans.length===0&&state.currentGamePicks.length===0){
+        c.innerHTML='<p class="text-muted">Серия ещё не начата.</p>';
+    }else{
+        let h='<div style="display:flex;flex-direction:column;gap:14px;">';
+        state.seriesHistory.forEach(g=>{
+            h+=`<div style="border:1px solid var(--border-color);border-radius:8px;padding:12px;">
+                <h4 style="margin-bottom:8px;">Игра ${g.gameNumber} ${g.winner==='radiant'?'🏛️ Radiant':g.winner==='dire'?'💀 Dire':''}</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong>
+                        <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${g.bans?.radiant?.join(', ')||'—'}</div>
+                        <div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${g.picks?.radiant?.join(', ')||'—'}</div>
+                    </div>
+                    <div><strong style="color:var(--dire-color);">💀 Dire</strong>
+                        <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${g.bans?.dire?.join(', ')||'—'}</div>
+                        <div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${g.picks?.dire?.join(', ')||'—'}</div>
+                    </div>
+                </div>
+            </div>`;
+        });
+        if((state.currentGameBans.length>0||state.currentGamePicks.length>0)&&
+           !state.seriesHistory.some(g=>g.gameNumber===state.currentGame)){
+            h+=`<div style="border:1px solid var(--accent-blue);border-radius:8px;padding:12px;opacity:0.8;">
+                <h4 style="margin-bottom:8px;">Игра ${state.currentGame} (текущая)</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong>
+                        <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${state.bans.radiant.join(', ')||'—'}</div>
+                        <div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${state.picks.radiant.join(', ')||'—'}</div>
+                    </div>
+                    <div><strong style="color:var(--dire-color);">💀 Dire</strong>
+                        <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${state.bans.dire.join(', ')||'—'}</div>
+                        <div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${state.picks.dire.join(', ')||'—'}</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+        h+='</div>';c.innerHTML=h;
+    }
+    document.getElementById('historyModal').classList.remove('hidden');
+}
+
 function hideHistoryModal(){document.getElementById('historyModal')?.classList.add('hidden');}
 
-function showSeriesBannedModal(){const c=document.getElementById('seriesBannedContent');if(!c)return;if(state.seriesBannedHeroes.length===0){c.innerHTML='<p class="text-muted">Пока нет заблокированных героев.</p>';}else{let h='<div class="series-banned-grid">';[...state.seriesBannedHeroes].sort().forEach(hero=>{const u=getHeroImageUrl(hero);const gf=state.seriesHistory.find(g=>g.picks?.radiant?.includes(hero)||g.picks?.dire?.includes(hero));const gn=gf?gf.gameNumber:'?';h+=`<div class="series-banned-hero"><div class="sb-avatar" style="background-image:url(${u})"></div><div class="sb-info"><span class="sb-name">${hero}</span><span class="sb-game">Игра ${gn}</span></div></div>`;});h+='</div>';c.innerHTML=h;}document.getElementById('seriesBannedModal').classList.remove('hidden');}
+function showSeriesBannedModal(){
+    const c=document.getElementById('seriesBannedContent');if(!c)return;
+    if(state.seriesBannedHeroes.length===0){c.innerHTML='<p class="text-muted">Пока нет заблокированных героев.</p>';}
+    else{
+        let h='<div class="series-banned-grid">';
+        [...state.seriesBannedHeroes].sort().forEach(hero=>{
+            const u=getHeroImageUrl(hero);
+            const gf=state.seriesHistory.find(g=>g.picks?.radiant?.includes(hero)||g.picks?.dire?.includes(hero));
+            const gn=gf?gf.gameNumber:'?';
+            h+=`<div class="series-banned-hero">
+                <div class="sb-avatar" style="background-image:url(${u})"></div>
+                <div class="sb-info"><span class="sb-name">${hero}</span><span class="sb-game">Игра ${gn}</span></div>
+            </div>`;
+        });
+        h+='</div>';c.innerHTML=h;
+    }
+    document.getElementById('seriesBannedModal').classList.remove('hidden');
+}
+
 function hideSeriesBannedModal(){document.getElementById('seriesBannedModal')?.classList.add('hidden');}
 
-function showToast(msg,type='info'){const c=document.getElementById('toastContainer');if(!c)return;const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;c.appendChild(t);setTimeout(()=>t.remove(),2500);}
-function createParticles(){const c=document.getElementById('bgParticles');if(!c)return;for(let i=0;i<20;i++){const p=document.createElement('div');p.className='particle';p.style.left=Math.random()*100+'%';p.style.animationDelay=Math.random()*6+'s';p.style.animationDuration=(5+Math.random()*8)+'s';p.style.width=p.style.height=(1+Math.random()*2)+'px';c.appendChild(p);}}
+function showToast(msg,type='info'){
+    const c=document.getElementById('toastContainer');if(!c)return;
+    const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;
+    c.appendChild(t);setTimeout(()=>t.remove(),2500);
+}
+
+function createParticles(){
+    const c=document.getElementById('bgParticles');if(!c)return;
+    for(let i=0;i<20;i++){
+        const p=document.createElement('div');p.className='particle';
+        p.style.left=Math.random()*100+'%';
+        p.style.animationDelay=Math.random()*6+'s';
+        p.style.animationDuration=(5+Math.random()*8)+'s';
+        p.style.width=p.style.height=(1+Math.random()*2)+'px';
+        c.appendChild(p);
+    }
+}
 
 // ==================== EVENT LISTENERS ====================
 document.addEventListener('DOMContentLoaded',()=>{
@@ -347,9 +742,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.getElementById('btnDireWin').addEventListener('click',()=>setGameWinner('dire'));
     document.getElementById('btnSkipWinner').addEventListener('click',skipWinner);
 
-    document.querySelectorAll('.modal-overlay').forEach(ov=>{ov.addEventListener('click',(e)=>{if(e.target===ov){ov.classList.add('hidden');if(ov.id==='winnerModal'&&state.waitingForWinner)skipWinner();}});});
+    document.querySelectorAll('.modal-overlay').forEach(ov=>{
+        ov.addEventListener('click',(e)=>{
+            if(e.target===ov){
+                ov.classList.add('hidden');
+                if(ov.id==='winnerModal'&&state.waitingForWinner)skipWinner();
+            }
+        });
+    });
 
-    document.addEventListener('keydown',(e)=>{if(e.ctrlKey&&e.key==='z'){e.preventDefault();undoLastAction();}if(e.ctrlKey&&e.key==='n'){e.preventDefault();if(!document.getElementById('btnNextGame').disabled)nextGame();}if(e.key==='Escape'){hideSettingsModal();hideHistoryModal();hideSeriesBannedModal();}});
+    document.addEventListener('keydown',(e)=>{
+        if(e.ctrlKey&&e.key==='z'){e.preventDefault();undoLastAction();}
+        if(e.ctrlKey&&e.key==='n'){e.preventDefault();if(!document.getElementById('btnNextGame').disabled)nextGame();}
+        if(e.key==='Escape'){hideSettingsModal();hideHistoryModal();hideSeriesBannedModal();}
+    });
 
     renderAll();updateUI();
     document.getElementById('connInfo').style.display='none';

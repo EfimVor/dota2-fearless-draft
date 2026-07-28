@@ -1,8 +1,8 @@
 {
-  "_comment": "force rebuild 3 - captains fix",
+  "_comment": "force rebuild 4 - separate captains",
   "name": "dota2-fearless-draft",
-  "version": "2.0.2",
-  "description": "Dota 2 Fearless Draft — мультиплеерный драфт героев через интернет",
+  "version": "2.0.3",
+  "description": "Dota 2 Fearless Draft",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
