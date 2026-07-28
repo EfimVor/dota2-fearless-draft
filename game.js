@@ -1,4 +1,4 @@
-/* Dota 2 Fearless Draft - Game Logic (v2) */
+/* Dota 2 Fearless Draft - Game Logic (v3) */
 var ALL_HEROES = {
     strength: ["Abaddon","Alchemist","Axe","Bristleback","Centaur Warrunner","Chaos Knight","Dawnbreaker","Doom","Dragon Knight","Earth Spirit","Earthshaker","Elder Titan","Huskar","Kunkka","Legion Commander","Lifestealer","Mars","Night Stalker","Ogre Magi","Omniknight","Primal Beast","Pudge","Sand King","Slardar","Sven","Tidehunter","Timbersaw","Tiny","Treant Protector","Tusk","Underlord","Undying","Wraith King"],
     agility: ["Anti-Mage","Arc Warden","Bloodseeker","Bounty Hunter","Clinkz","Drow Ranger","Ember Spirit","Faceless Void","Gyrocopter","Hoodwink","Juggernaut","Kez","Luna","Medusa","Meepo","Monkey King","Morphling","Muerta","Naga Siren","Nyx Assassin","Phantom Assassin","Phantom Lancer","Razor","Riki","Shadow Fiend","Slark","Sniper","Spectre","Templar Assassin","Terrorblade","Troll Warlord","Ursa","Viper","Weaver"],
@@ -13,7 +13,7 @@ function attrBg(a){var c={strength:"#1a100e",agility:"#0e1a12",intelligence:"#0e
 function attrLabel(a){var l={strength:"Сила",agility:"Ловкость",intelligence:"Интеллект",universal:"Универсал"};return l[a]||a;}
 
 // Config
-var CFG={heroesPerAttribute:10,bansPerTeam:3,picksPerTeam:5,banOrder:["radiant","dire","radiant","dire","radiant","dire"],pickOrder:["radiant","dire","dire","radiant","radiant","dire","dire","radiant","radiant","dire"]};
+var CFG={heroesPerAttribute:9,bansPerTeam:3,picksPerTeam:5,banOrder:["radiant","dire","radiant","dire","radiant","dire"],pickOrder:["radiant","dire","dire","radiant","radiant","dire","dire","radiant","radiant","dire"]};
 
 // Network
 var ws=null,roomCode=null,svCaptains={radiant:null,dire:null},isRemote=false;
@@ -175,7 +175,26 @@ function addGameToHistory(){if(game.seriesHistory.some(function(g){return g.game
 function undoLastAction(){if(!isLocal()){toast("Только капитаны могут отменять","error");return;}if(!game.seriesStarted)return;if(game.phase==="complete"){toast("Игра завершена","error");return;}if(game.currentGameBans.length===0&&game.currentGamePicks.length===0){toast("Нечего отменять","error");return;}undoLocal();broadcast({type:"undo"});syncState();}
 function undoLocal(){if(game.phase==="pick"&&game.currentGamePicks.length>0){var last=game.currentGamePicks.pop();game.picks[last.team].pop();game.step--;game.currentTurn=pickStepTeam(game.step);}else if(game.phase==="ban"&&game.currentGameBans.length>0){var last=game.currentGameBans.pop();game.bans[last.team].pop();game.step--;game.currentTurn=banStepTeam(game.step);}else if(game.phase==="pick"&&game.currentGamePicks.length===0&&game.currentGameBans.length>0){var last=game.currentGameBans.pop();game.bans[last.team].pop();game.phase="ban";game.step=totalBans()-1;game.currentTurn=banStepTeam(game.step);}game.mainTimer=30;refresh();startTimer(game.currentTurn);toast("Отменено","info");}
 function nextGame(){if(!isLocal()){toast("Только капитаны могут перейти дальше","error");return;}if(game.phase!=="complete"){toast("Сначала завершите драфт!","error");return;}nextGameLocal();broadcast({type:"next_game"});syncState();}
-function nextGameLocal(){var banned=game.seriesBannedHeroes.slice();game.currentGamePicks.forEach(function(p){if(banned.indexOf(p.hero)===-1)banned.push(p.hero);});var nextNum=game.currentGame+1;game=freshState();game.currentGame=nextNum;game.seriesBannedHeroes=banned;game.availableHeroes=genPool();game.phase="ban";game.step=0;game.currentTurn=CFG.banOrder[0];game.seriesStarted=true;refresh();toast("Игра "+game.currentGame+" началась! Фаза банов","info");}
+function nextGameLocal(){
+    // Сохраняем историю перед сбросом
+    var hist = game.seriesHistory.slice();
+    // Добавляем текущую игру, если ещё не добавлена
+    if (!hist.some(function(g){return g.gameNumber===game.currentGame;})) {
+        hist.push({gameNumber:game.currentGame, bans:JSON.parse(JSON.stringify(game.bans)), picks:JSON.parse(JSON.stringify(game.picks))});
+    }
+    var banned=game.seriesBannedHeroes.slice();
+    game.currentGamePicks.forEach(function(p){if(banned.indexOf(p.hero)===-1)banned.push(p.hero);});
+    var nextNum=game.currentGame+1;
+    game=freshState();
+    game.seriesHistory = hist;   // восстанавливаем историю
+    game.currentGame=nextNum;
+    game.seriesBannedHeroes=banned;
+    game.availableHeroes=genPool();
+    game.phase="ban";game.step=0;game.currentTurn=CFG.banOrder[0];
+    game.seriesStarted=true;
+    refresh();
+    toast("Игра "+game.currentGame+" началась! Фаза банов","info");
+}
 
 // Render
 function refresh(){renderHeroPool();renderTeamBans("radiant");renderTeamBans("dire");renderTeamPicks("radiant");renderTeamPicks("dire");renderHistoryPanel();updateAttrCounts();updateGameBadge();updatePhaseBadge();updateScoreDisplay();renderCaptainBar();updateButtons();updateTimerDisplay();updateSpecUI();}
