@@ -1,5 +1,5 @@
 /**
- * Dota 2 — Fearless Draft Client (v4 — капитаны не сбрасываются)
+ * Dota 2 — Fearless Draft Client (v5 – плавный таймер, баны с картинками, без выбора победителя)
  * Мультиплеер через WebSocket. Таймеры 30с + 2:10 резерв.
  */
 
@@ -56,7 +56,6 @@ function handleServerMessage(msg) {
             roomCode=msg.roomCode; serverCaptains=msg.captains||{radiant:null,dire:null};
             document.getElementById('roomCodeDisplay').textContent=roomCode;
             document.getElementById('connInfo').style.display='flex';
-            // При первом входе синхронизируем капитанов (но не перезаписываем локальных)
             syncCaptainsFromServer();
             if(msg.state){isRemoteAction=true;deserializeState(msg.state);isRemoteAction=false;renderAll();updateUI();}
             updateConnectionStatus('connected',`Комната ${roomCode}`);
@@ -69,13 +68,20 @@ function handleServerMessage(msg) {
         case 'CAPTAIN_LEFT': serverCaptains[msg.team]=null; syncCaptainsFromServer(); renderCaptainBar(); break;
         case 'STATE_SYNC':
             serverCaptains=msg.captains||serverCaptains;
-            // Не перезаписываем локальных капитанов
             if(msg.state){isRemoteAction=true;deserializeState(msg.state);isRemoteAction=false;renderAll();updateUI();}
             break;
         case 'GAME_ACTION':
             isRemoteAction=true; handleRemoteAction(msg.action); isRemoteAction=false;
             if(msg.captains){serverCaptains=msg.captains;}
             renderAll(); updateUI();
+            break;
+        case 'TIMER_TICK':
+            // Обновляем только данные таймера для плавного отображения
+            if(msg.timerData) {
+                state.mainTimer = msg.timerData.mainTimer;
+                if(msg.timerData.reserveTimers) state.reserveTimers = msg.timerData.reserveTimers;
+                updateTimerDisplay();
+            }
             break;
         case 'PLAYER_JOINED': showToast('Игрок подключился к комнате','info'); break;
         case 'PLAYER_LEFT': showToast('Игрок отключился','info'); break;
@@ -86,7 +92,7 @@ function handleServerMessage(msg) {
 function sendMessage(msg){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(msg));}
 function syncGameState(){if(!roomCode)return;sendMessage({type:'SYNC_STATE',state:serializeState()});}
 function broadcastAction(action){if(!roomCode||isRemoteAction)return;sendMessage({type:'GAME_ACTION',action});syncGameState();}
-function handleRemoteAction(action){switch(action.type){case'ban':applyBanLocally(action.hero,action.attribute,action.team);break;case'pick':applyPickLocally(action.hero,action.attribute,action.team);break;case'undo':applyUndoLocally();break;case'new_series':applyNewSeriesLocally(action.serializedState);break;case'next_game':applyNextGameLocally();break;case'set_winner':applyWinnerLocally(action.winner);break;}}
+function handleRemoteAction(action){switch(action.type){case'ban':applyBanLocally(action.hero,action.attribute,action.team);break;case'pick':applyPickLocally(action.hero,action.attribute,action.team);break;case'undo':applyUndoLocally();break;case'new_series':applyNewSeriesLocally(action.serializedState);break;case'next_game':applyNextGameLocally();break;case'set_winner':break;}}
 
 // ==================== CONNECTION UI ====================
 function updateConnectionStatus(status,text){const dot=document.querySelector('.conn-dot');const textEl=document.getElementById('connText');if(dot){dot.className='conn-dot';dot.classList.add(status);}if(textEl)textEl.textContent=text;}
@@ -94,11 +100,10 @@ function createRoom(){sendMessage({type:'CREATE_ROOM'});}
 function joinRoom(code){if(!code){code=document.getElementById('joinRoomInput').value.trim();}if(!code||code.length!==6){showToast('Введите 6-значный код комнаты','error');return;}sendMessage({type:'JOIN_ROOM',roomCode:code});const newUrl=new URL(location);newUrl.searchParams.set('room',code);history.replaceState({},'',newUrl);}
 function copyInviteLink(){if(!roomCode)return;const link=`${location.origin}${location.pathname}?room=${roomCode}`;navigator.clipboard.writeText(link).then(()=>{showToast('Ссылка скопирована! Отправьте её сопернику.','success');}).catch(()=>{const helper=document.getElementById('copyHelper');helper.value=link;helper.select();document.execCommand('copy');showToast('Ссылка скопирована!','success');});}
 
-// ==================== CAPTAINS (отдельно от игрового состояния) ====================
-let captains = {radiant:null,dire:null}; // {name, id} или null
+// ==================== CAPTAINS ====================
+let captains = {radiant:null,dire:null};
 
 function syncCaptainsFromServer() {
-    // Не трогаем локальных капитанов, только обновляем информацию с сервера
     if (serverCaptains.radiant && (!captains.radiant || captains.radiant.id !== 'local')) {
         captains.radiant = {name: serverCaptains.radiant, id: 'remote'};
     } else if (!serverCaptains.radiant && captains.radiant && captains.radiant.id !== 'local') {
@@ -112,11 +117,11 @@ function syncCaptainsFromServer() {
 }
 
 function isMyCaptain(team) {
-    if (!captains[team]) return true; // нет капитана — свободный доступ
+    if (!captains[team]) return true;
     return captains[team].id !== 'remote';
 }
 
-// ==================== GAME STATE (без captains) ====================
+// ==================== GAME STATE ====================
 function createInitialState(){
     return {
         seriesStarted:false, currentGame:1,
@@ -127,7 +132,6 @@ function createInitialState(){
         seriesBannedHeroes:[],
         seriesHistory:[],
         radiantScore:0, direScore:0,
-        waitingForWinner:false,
         mainTimer:30,
         reserveTimers:{radiant:130,dire:130}
     };
@@ -144,7 +148,6 @@ function serializeState(){
         seriesBannedHeroes:[...state.seriesBannedHeroes],
         seriesHistory:JSON.parse(JSON.stringify(state.seriesHistory)),
         radiantScore:state.radiantScore, direScore:state.direScore,
-        waitingForWinner:state.waitingForWinner,
         mainTimer:state.mainTimer,
         reserveTimers:{radiant:state.reserveTimers.radiant,dire:state.reserveTimers.dire}
     };
@@ -159,7 +162,7 @@ function deserializeState(s){
     state.currentGameBans=s.currentGameBans; state.currentGamePicks=s.currentGamePicks;
     state.seriesBannedHeroes=[...(s.seriesBannedHeroes||[])];
     state.seriesHistory=s.seriesHistory; state.radiantScore=s.radiantScore;
-    state.direScore=s.direScore; state.waitingForWinner=s.waitingForWinner;
+    state.direScore=s.direScore;
     state.mainTimer=s.mainTimer!==undefined?s.mainTimer:30;
     state.reserveTimers=s.reserveTimers||{radiant:130,dire:130};
 }
@@ -170,12 +173,13 @@ let turnTimerInterval = null;
 function startTurnTimer(team) {
     stopTurnTimer();
     updateTimerDisplay();
-    if (!state.seriesStarted || state.phase === 'complete' || state.waitingForWinner) return;
+    if (!state.seriesStarted || state.phase === 'complete') return;
     const isOurTurn = state.currentTurn === team;
     const isLocalCaptain = !captains[team] || captains[team].id === 'local';
     if (!isOurTurn || !isLocalCaptain) return;
+
     turnTimerInterval = setInterval(() => {
-        if (state.phase === 'complete' || state.waitingForWinner) { stopTurnTimer(); return; }
+        if (state.phase === 'complete') { stopTurnTimer(); return; }
         if (state.mainTimer > 0) {
             state.mainTimer--;
         } else {
@@ -188,7 +192,17 @@ function startTurnTimer(team) {
             }
         }
         updateTimerDisplay();
-        if (roomCode && state.mainTimer % 5 === 0) syncGameState();
+
+        // Отправляем таймер каждую секунду для плавного отображения у соперника
+        if (roomCode && !isRemoteAction) {
+            sendMessage({
+                type: 'TIMER_SYNC',
+                timerData: {
+                    mainTimer: state.mainTimer,
+                    reserveTimers: state.reserveTimers
+                }
+            });
+        }
     }, 1000);
 }
 
@@ -219,7 +233,7 @@ function updateTimerDisplay() {
     const timerReserve = document.getElementById('timerReserve');
     const timerContainer = document.getElementById('timerContainer');
     const turnInfo = document.getElementById('turnInfo');
-    if (!state.seriesStarted || state.phase === 'complete' || state.waitingForWinner) {
+    if (!state.seriesStarted || state.phase === 'complete') {
         if(timerContainer) timerContainer.style.display = 'none';
         if(turnInfo) turnInfo.style.display = 'block';
         return;
@@ -258,12 +272,10 @@ function confirmCaptainName(){const input=document.getElementById('captainNameIn
 function leaveCaptain(team){if(captains[team]&&captains[team].id==='remote')return;captains[team]=null;sendMessage({type:'LEAVE_CAPTAIN',team});serverCaptains[team]=null;renderCaptainBar();updateUI();}
 
 function startNewSeries(){
-    const savedCaptains = captains; // сохраняем текущих капитанов
     state = createInitialState();
     state.seriesStarted = true;
     state.availableHeroes = generateHeroPool();
     state.phase = 'ban'; state.step = 0; state.currentTurn = config.banOrder[0];
-    // captains не трогаем — они остаются глобальными
     renderAll(); updateUI();
     broadcastAction({type:'new_series', serializedState: serializeState()});
     syncGameState();
@@ -284,7 +296,6 @@ function applyNewSeriesLocally(ss){
 function banHero(hero,attribute){
     if(state.phase!=='ban'){showToast('Сейчас фаза пиков!','error');return;}
     if(!state.seriesStarted){showToast('Начните новую серию!','error');return;}
-    if(state.waitingForWinner)return;
     const pool=state.availableHeroes[attribute];
     if(!pool||!pool.includes(hero)){showToast('Герой недоступен!','error');return;}
     const team=getBanStepTeam(state.step);
@@ -313,7 +324,6 @@ function applyBanLocally(hero,attribute,team){
 function pickHero(hero,attribute){
     if(state.phase!=='pick'){showToast('Сейчас фаза банов!','error');return;}
     if(!state.seriesStarted){showToast('Начните новую серию!','error');return;}
-    if(state.waitingForWinner)return;
     const pool=state.availableHeroes[attribute];
     if(!pool||!pool.includes(hero)){showToast('Герой недоступен!','error');return;}
     const team=getPickStepTeam(state.step);
@@ -330,15 +340,19 @@ function applyPickLocally(hero,attribute,team){
     state.availableHeroes[attribute]=state.availableHeroes[attribute].filter(h=>h!==hero);
     state.step++;
     if(state.step>=totalPicks()){
-        state.phase='complete'; state.waitingForWinner=true;
+        state.phase='complete';
         stopTurnTimer();
+        // Сразу синхронизируем завершение
+        syncGameState();
     }else{
         state.currentTurn=getPickStepTeam(state.step);
         state.mainTimer=30;
     }
     renderAll(); updateUI();
-    if(!state.waitingForWinner) startTurnTimer(state.currentTurn);
-    checkSkipFullTeam();
+    if(state.phase!=='complete') {
+        startTurnTimer(state.currentTurn);
+        checkSkipFullTeam();
+    }
 }
 
 function checkSkipFullTeam(){
@@ -346,21 +360,24 @@ function checkSkipFullTeam(){
     if(state.picks[team].length>=config.picksPerTeam){
         state.step++;
         if(state.step>=totalPicks()){
-            state.phase='complete'; state.waitingForWinner=true;
+            state.phase='complete';
             stopTurnTimer();
+            syncGameState();
         }else{
             state.currentTurn=getPickStepTeam(state.step);
             state.mainTimer=30;
         }
         renderAll(); updateUI();
-        if(!state.waitingForWinner) startTurnTimer(state.currentTurn);
-        checkSkipFullTeam();
+        if(state.phase!=='complete') {
+            startTurnTimer(state.currentTurn);
+            checkSkipFullTeam();
+        }
     }
 }
 
 function undoLastAction(){
     if(!state.seriesStarted)return;
-    if(state.waitingForWinner){showToast('Игра завершена, отмена невозможна.','error');return;}
+    if(state.phase==='complete'){showToast('Игра завершена, отмена невозможна.','error');return;}
     const hasBans=state.currentGameBans.length>0;
     const hasPicks=state.currentGamePicks.length>0;
     if(!hasBans&&!hasPicks){showToast('Нечего отменять!','error');return;}
@@ -391,7 +408,6 @@ function applyUndoLocally(){
         state.availableHeroes[last.attribute].push(last.hero);
         state.phase='ban'; state.step=totalBans()-1; state.currentTurn=getBanStepTeam(state.step);
     }
-    state.waitingForWinner=false; hideWinnerModal();
     state.mainTimer=30;
     renderAll(); updateUI();
     startTurnTimer(state.currentTurn);
@@ -399,56 +415,26 @@ function applyUndoLocally(){
 }
 
 function nextGame(){
-    if(state.waitingForWinner){showToast('Сначала укажите победителя!','error');return;}
+    if(state.phase!=='complete'){showToast('Сначала завершите драфт!','error');return;}
     applyNextGameLocally();
     broadcastAction({type:'next_game'});
     syncGameState();
 }
 
 function applyNextGameLocally(){
-    const gr={gameNumber:state.currentGame,bans:JSON.parse(JSON.stringify(state.bans)),picks:JSON.parse(JSON.stringify(state.picks)),winner:null};
+    const gr={gameNumber:state.currentGame,bans:JSON.parse(JSON.stringify(state.bans)),picks:JSON.parse(JSON.stringify(state.picks))};
     state.currentGamePicks.forEach(p=>{if(!state.seriesBannedHeroes.includes(p.hero))state.seriesBannedHeroes.push(p.hero);});
     state.seriesHistory.push(gr);
+    const nextGameNum = state.currentGame + 1;
+    const currentBanned = [...state.seriesBannedHeroes];
     state = createInitialState();
-    state.currentGame = gr.gameNumber + 1;
-    state.bans={radiant:[],dire:[]}; state.picks={radiant:[],dire:[]};
-    state.currentGameBans=[]; state.currentGamePicks=[];
-    state.phase='ban'; state.step=0; state.currentTurn=config.banOrder[0];
-    state.waitingForWinner=false; state.mainTimer=30;
-    state.reserveTimers={radiant:130,dire:130};
-    state.seriesBannedHeroes = [...state.seriesBannedHeroes]; // сохраняем
-    state.availableHeroes=generateHeroPool();
+    state.currentGame = nextGameNum;
+    state.seriesBannedHeroes = currentBanned;
+    state.availableHeroes = generateHeroPool();
+    state.phase = 'ban'; state.step = 0; state.currentTurn = config.banOrder[0];
+    state.seriesStarted = true;
     renderAll(); updateUI();
     showToast(`Игра ${state.currentGame} началась! Фаза банов`,'info');
-}
-
-function setGameWinner(winner){
-    if(!state.waitingForWinner)return;
-    applyWinnerLocally(winner);
-    broadcastAction({type:'set_winner',winner});
-    syncGameState();
-}
-
-function applyWinnerLocally(winner){
-    if(state.seriesHistory.length>0){
-        const last=state.seriesHistory[state.seriesHistory.length-1];
-        if(!last.winner&&last.gameNumber===state.currentGame-1){last.winner=winner;}
-        else{addGameRecord(winner);}
-    }else{addGameRecord(winner);}
-    if(winner==='radiant')state.radiantScore++;else if(winner==='dire')state.direScore++;
-    state.waitingForWinner=false; hideWinnerModal();
-    renderAll(); updateUI();
-    showToast(`${winner==='radiant'?'Radiant':'Dire'} победили! 🏆`,'success');
-}
-
-function addGameRecord(winner){
-    state.seriesHistory.push({gameNumber:state.currentGame,bans:JSON.parse(JSON.stringify(state.bans)),picks:JSON.parse(JSON.stringify(state.picks)),winner});
-}
-
-function skipWinner(){
-    if(!state.waitingForWinner)return;
-    state.waitingForWinner=false; hideWinnerModal(); updateUI();
-    showToast('Победитель не указан.','info');
 }
 
 // ==================== RENDER ====================
@@ -502,8 +488,17 @@ function renderTeamBans(team){
     const c=document.getElementById(`${team}BanSlots`); if(!c)return;
     const bans=state.bans[team]||[]; c.innerHTML='';
     for(let i=0;i<config.bansPerTeam;i++){
-        const s=document.createElement('div'); s.className='ban-slot'+(i<bans.length?' filled':' empty');
-        s.textContent=i<bans.length?bans[i]:'—'; if(i<bans.length)s.title=bans[i];
+        const s=document.createElement('div');
+        s.className='ban-slot';
+        if(i<bans.length){
+            s.className+=' filled';
+            const imgUrl=getHeroImageUrl(bans[i]);
+            if(imgUrl) s.style.backgroundImage=`url(${imgUrl})`;
+            // Добавляем название героя для тултипа
+            s.title=bans[i];
+        }else{
+            s.className+=' empty';
+        }
         c.appendChild(s);
     }
 }
@@ -567,9 +562,9 @@ function updateTurnDisplay(){
         if(tI){tI.textContent='Подключитесь к комнате для начала';tI.className='turn-info';}
         resetPanelGlows(); return;
     }
-    if(state.phase==='complete'||state.waitingForWinner){
+    if(state.phase==='complete'){
         rT?.classList.add('hidden'); dT?.classList.add('hidden');
-        if(tI){tI.textContent='Все пики сделаны — выберите победителя';tI.className='turn-info';}
+        if(tI){tI.textContent='Драфт завершён';tI.className='turn-info';}
         resetPanelGlows(); return;
     }
     const isR=state.currentTurn==='radiant';
@@ -590,13 +585,14 @@ function resetPanelGlows(){
 function updateButtons(){
     const u=document.getElementById('btnUndo'),n=document.getElementById('btnNextGame');
     const hasA=(state.phase==='ban'&&state.currentGameBans.length>0)||(state.phase==='pick'&&(state.currentGamePicks.length>0||state.currentGameBans.length>0));
-    if(u)u.disabled=!state.seriesStarted||!hasA||state.waitingForWinner;
-    if(n)n.disabled=!state.seriesStarted||state.phase!=='complete'||state.waitingForWinner;
+    if(u)u.disabled=!state.seriesStarted||!hasA||state.phase==='complete';
+    if(n)n.disabled=!state.seriesStarted||state.phase!=='complete';
 }
 
 // ==================== MODALS ====================
-function showWinnerModal(){document.getElementById('winnerModal')?.classList.remove('hidden');document.getElementById('winnerGameNum').textContent=state.currentGame;}
+// Модалка победителя больше не используется
 function hideWinnerModal(){document.getElementById('winnerModal')?.classList.add('hidden');}
+
 function showSettingsModal(){
     document.getElementById('settingHeroesPerAttr').value=config.heroesPerAttribute;
     document.getElementById('settingBansPerTeam').value=config.bansPerTeam;
@@ -605,7 +601,9 @@ function showSettingsModal(){
     document.getElementById('settingPickOrder').value=config.pickOrder.join(',');
     document.getElementById('settingsModal').classList.remove('hidden');
 }
+
 function hideSettingsModal(){document.getElementById('settingsModal')?.classList.add('hidden');}
+
 function applySettings(){
     const hpa=Math.max(5,Math.min(15,parseInt(document.getElementById('settingHeroesPerAttr').value)||10));
     const bpt=Math.max(1,Math.min(5,parseInt(document.getElementById('settingBansPerTeam').value)||3));
@@ -631,7 +629,7 @@ function showHistoryModal(){
         let h='<div style="display:flex;flex-direction:column;gap:14px;">';
         state.seriesHistory.forEach(g=>{
             h+=`<div style="border:1px solid var(--border-color);border-radius:8px;padding:12px;">
-                <h4 style="margin-bottom:8px;">Игра ${g.gameNumber} ${g.winner==='radiant'?'🏛️ Radiant':g.winner==='dire'?'💀 Dire':''}</h4>
+                <h4 style="margin-bottom:8px;">Игра ${g.gameNumber}</h4>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong>
                         <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${g.bans?.radiant?.join(', ')||'—'}</div>
@@ -738,15 +736,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.getElementById('btnSeriesBanned').addEventListener('click',showSeriesBannedModal);
     document.getElementById('btnSeriesBannedClose').addEventListener('click',hideSeriesBannedModal);
 
-    document.getElementById('btnRadiantWin').addEventListener('click',()=>setGameWinner('radiant'));
-    document.getElementById('btnDireWin').addEventListener('click',()=>setGameWinner('dire'));
-    document.getElementById('btnSkipWinner').addEventListener('click',skipWinner);
-
+    // Кнопки победителя скрыты за ненадобностью
     document.querySelectorAll('.modal-overlay').forEach(ov=>{
         ov.addEventListener('click',(e)=>{
             if(e.target===ov){
                 ov.classList.add('hidden');
-                if(ov.id==='winnerModal'&&state.waitingForWinner)skipWinner();
             }
         });
     });

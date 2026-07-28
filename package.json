@@ -1,7 +1,7 @@
 {
-  "_comment": "force rebuild 4 - separate captains",
+  "_comment": "build 5 - smooth timer, ban images, no winner modal",
   "name": "dota2-fearless-draft",
-  "version": "2.0.3",
+  "version": "2.1.0",
   "description": "Dota 2 Fearless Draft",
   "main": "server.js",
   "scripts": {
