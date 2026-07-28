@@ -1,5 +1,5 @@
 /**
- * Dota 2 — Fearless Draft Client
+ * Dota 2 — Fearless Draft Client (v3 — исправлена инициализация captains)
  * Мультиплеер через WebSocket. Таймеры 30с + 2:10 резерв.
  */
 
@@ -91,13 +91,65 @@ function joinRoom(code){if(!code){code=document.getElementById('joinRoomInput').
 function copyInviteLink(){if(!roomCode)return;const link=`${location.origin}${location.pathname}?room=${roomCode}`;navigator.clipboard.writeText(link).then(()=>{showToast('Ссылка скопирована! Отправьте её сопернику.','success');}).catch(()=>{const helper=document.getElementById('copyHelper');helper.value=link;helper.select();document.execCommand('copy');showToast('Ссылка скопирована!','success');});}
 
 // ==================== GAME STATE ====================
-function createInitialState(){return{seriesStarted:false,currentGame:1,availableHeroes:{strength:[],agility:[],intelligence:[],universal:[]},phase:'ban',step:0,currentTurn:'radiant',bans:{radiant:[],dire:[]},picks:{radiant:[],dire:[]},currentGameBans:[],currentGamePicks:[],seriesBannedHeroes:[],seriesHistory:[],radiantScore:0,direScore:0,waitingForWinner:false,mainTimer:30,reserveTimers:{radiant:130,dire:130}};}
+function createInitialState(){
+    return {
+        seriesStarted:false, currentGame:1,
+        availableHeroes:{strength:[],agility:[],intelligence:[],universal:[]},
+        phase:'ban', step:0, currentTurn:'radiant',
+        bans:{radiant:[],dire:[]}, picks:{radiant:[],dire:[]},
+        currentGameBans:[], currentGamePicks:[],
+        seriesBannedHeroes:[],
+        seriesHistory:[],
+        radiantScore:0, direScore:0,
+        waitingForWinner:false,
+        mainTimer:30,
+        reserveTimers:{radiant:130,dire:130},
+        captains:{radiant:null,dire:null}  // ← ВОТ ЭТО ИСПРАВЛЕНИЕ: captains теперь внутри состояния
+    };
+}
 let state = createInitialState();
 
-function serializeState(){return{seriesStarted:state.seriesStarted,currentGame:state.currentGame,availableHeroes:JSON.parse(JSON.stringify(state.availableHeroes)),phase:state.phase,step:state.step,currentTurn:state.currentTurn,bans:JSON.parse(JSON.stringify(state.bans)),picks:JSON.parse(JSON.stringify(state.picks)),currentGameBans:[...state.currentGameBans],currentGamePicks:[...state.currentGamePicks],seriesBannedHeroes:[...state.seriesBannedHeroes],seriesHistory:JSON.parse(JSON.stringify(state.seriesHistory)),radiantScore:state.radiantScore,direScore:state.direScore,waitingForWinner:state.waitingForWinner,mainTimer:state.mainTimer,reserveTimers:{radiant:state.reserveTimers.radiant,dire:state.reserveTimers.dire}};}
-function deserializeState(s){if(!s)return;state.seriesStarted=s.seriesStarted;state.currentGame=s.currentGame;state.availableHeroes=s.availableHeroes;state.phase=s.phase;state.step=s.step;state.currentTurn=s.currentTurn;state.bans=s.bans;state.picks=s.picks;state.currentGameBans=s.currentGameBans;state.currentGamePicks=s.currentGamePicks;state.seriesBannedHeroes=[...(s.seriesBannedHeroes||[])];state.seriesHistory=s.seriesHistory;state.radiantScore=s.radiantScore;state.direScore=s.direScore;state.waitingForWinner=s.waitingForWinner;state.mainTimer=s.mainTimer!==undefined?s.mainTimer:30;state.reserveTimers=s.reserveTimers||{radiant:130,dire:130};}
-function syncLocalCaptainsFromServer(){if(serverCaptains.radiant)state.captains.radiant={name:serverCaptains.radiant,id:'remote'};else state.captains.radiant=null;if(serverCaptains.dire)state.captains.dire={name:serverCaptains.dire,id:'remote'};else state.captains.dire=null;}
-state.captains = {radiant:null,dire:null};
+function serializeState(){
+    return {
+        seriesStarted:state.seriesStarted, currentGame:state.currentGame,
+        availableHeroes:JSON.parse(JSON.stringify(state.availableHeroes)),
+        phase:state.phase, step:state.step, currentTurn:state.currentTurn,
+        bans:JSON.parse(JSON.stringify(state.bans)), picks:JSON.parse(JSON.stringify(state.picks)),
+        currentGameBans:[...state.currentGameBans], currentGamePicks:[...state.currentGamePicks],
+        seriesBannedHeroes:[...state.seriesBannedHeroes],
+        seriesHistory:JSON.parse(JSON.stringify(state.seriesHistory)),
+        radiantScore:state.radiantScore, direScore:state.direScore,
+        waitingForWinner:state.waitingForWinner,
+        mainTimer:state.mainTimer,
+        reserveTimers:{radiant:state.reserveTimers.radiant,dire:state.reserveTimers.dire},
+        captains:JSON.parse(JSON.stringify(state.captains)) // ← Сохраняем captains
+    };
+}
+
+function deserializeState(s){
+    if(!s)return;
+    state.seriesStarted=s.seriesStarted; state.currentGame=s.currentGame;
+    state.availableHeroes=s.availableHeroes; state.phase=s.phase;
+    state.step=s.step; state.currentTurn=s.currentTurn;
+    state.bans=s.bans; state.picks=s.picks;
+    state.currentGameBans=s.currentGameBans; state.currentGamePicks=s.currentGamePicks;
+    state.seriesBannedHeroes=[...(s.seriesBannedHeroes||[])];
+    state.seriesHistory=s.seriesHistory; state.radiantScore=s.radiantScore;
+    state.direScore=s.direScore; state.waitingForWinner=s.waitingForWinner;
+    state.mainTimer=s.mainTimer!==undefined?s.mainTimer:30;
+    state.reserveTimers=s.reserveTimers||{radiant:130,dire:130};
+    state.captains=s.captains||{radiant:null,dire:null}; // ← Восстанавливаем captains
+    syncLocalCaptainsFromServer(); // ← И сразу подтягиваем серверных капитанов
+}
+
+function syncLocalCaptainsFromServer(){
+    // Гарантируем, что captains существует
+    if(!state.captains) state.captains = {radiant:null,dire:null};
+    if(serverCaptains.radiant) state.captains.radiant = {name:serverCaptains.radiant,id:'remote'};
+    else state.captains.radiant = null;
+    if(serverCaptains.dire) state.captains.dire = {name:serverCaptains.dire,id:'remote'};
+    else state.captains.dire = null;
+}
 
 // ==================== TIMER ====================
 let turnTimerInterval = null;
@@ -105,9 +157,10 @@ let turnTimerInterval = null;
 function startTurnTimer(team) {
     stopTurnTimer();
     updateTimerDisplay();
+    if (!state.seriesStarted || state.phase === 'complete' || state.waitingForWinner) return;
     const isOurTurn = state.currentTurn === team;
     const isLocalCaptain = !state.captains[team] || state.captains[team].id === 'local';
-    if (!isOurTurn || !isLocalCaptain || state.phase === 'complete' || state.waitingForWinner) return;
+    if (!isOurTurn || !isLocalCaptain) return;
     turnTimerInterval = setInterval(() => {
         if (state.phase === 'complete' || state.waitingForWinner) { stopTurnTimer(); return; }
         if (state.mainTimer > 0) {
@@ -126,9 +179,7 @@ function startTurnTimer(team) {
     }, 1000);
 }
 
-function stopTurnTimer() {
-    if (turnTimerInterval) { clearInterval(turnTimerInterval); turnTimerInterval = null; }
-}
+function stopTurnTimer() { if (turnTimerInterval) { clearInterval(turnTimerInterval); turnTimerInterval = null; } }
 
 function forceRandomAction(team) {
     const availableHeroes = [];
@@ -156,23 +207,25 @@ function updateTimerDisplay() {
     const timerContainer = document.getElementById('timerContainer');
     const turnInfo = document.getElementById('turnInfo');
     if (!state.seriesStarted || state.phase === 'complete' || state.waitingForWinner) {
-        timerContainer.style.display = 'none';
-        turnInfo.style.display = 'block';
+        if(timerContainer) timerContainer.style.display = 'none';
+        if(turnInfo) turnInfo.style.display = 'block';
         return;
     }
-    timerContainer.style.display = 'flex';
-    turnInfo.style.display = 'none';
+    if(timerContainer) timerContainer.style.display = 'flex';
+    if(turnInfo) turnInfo.style.display = 'none';
     const team = state.currentTurn;
     const reserve = state.reserveTimers[team] || 0;
     const mainMin = Math.floor(Math.max(0, state.mainTimer) / 60);
     const mainSec = Math.max(0, state.mainTimer) % 60;
-    timerMain.textContent = `${String(mainMin).padStart(2,'0')}:${String(mainSec).padStart(2,'0')}`;
+    if(timerMain) timerMain.textContent = `${String(mainMin).padStart(2,'0')}:${String(mainSec).padStart(2,'0')}`;
     const resMin = Math.floor(reserve / 60);
     const resSec = reserve % 60;
-    timerReserve.textContent = `+${resMin}:${String(resSec).padStart(2,'0')}`;
-    timerContainer.classList.remove('warning','danger');
-    if (state.mainTimer <= 10 && state.mainTimer > 0) timerContainer.classList.add('warning');
-    else if (state.mainTimer === 0) timerContainer.classList.add('danger');
+    if(timerReserve) timerReserve.textContent = `+${resMin}:${String(resSec).padStart(2,'0')}`;
+    if(timerContainer) {
+        timerContainer.classList.remove('warning','danger');
+        if (state.mainTimer <= 10 && state.mainTimer > 0) timerContainer.classList.add('warning');
+        else if (state.mainTimer === 0) timerContainer.classList.add('danger');
+    }
 }
 
 // ==================== HELPERS ====================
@@ -183,7 +236,7 @@ function getBanStepTeam(s){return config.banOrder[s]||(s%2===0?'radiant':'dire')
 function getPickStepTeam(s){return config.pickOrder[s]||(s%2===0?'radiant':'dire');}
 function totalBans(){return config.bansPerTeam*2;}
 function totalPicks(){return config.picksPerTeam*2;}
-function isMyCaptain(team){if(!state.captains[team])return true;return state.captains[team].id!=='remote';}
+function isMyCaptain(team){if(!state.captains||!state.captains[team])return true;return state.captains[team].id!=='remote';}
 
 // ==================== GAME ACTIONS ====================
 function claimCaptain(team){if(!roomCode){showToast('Сначала подключитесь к комнате!','error');return;}if(serverCaptains[team]){showToast(`Капитан ${team==='radiant'?'Radiant':'Dire'} уже выбран!`,'error');return;}pendingCaptainTeam=team;document.getElementById('captainNameModal').classList.remove('hidden');document.getElementById('captainNameInput').value='';document.getElementById('captainNameInput').focus();}
@@ -221,7 +274,15 @@ function renderHeroPool(){const grids={strength:'strengthGrid',agility:'agilityG
 function renderTeamBans(team){const c=document.getElementById(`${team}BanSlots`);if(!c)return;const bans=state.bans[team]||[];c.innerHTML='';for(let i=0;i<config.bansPerTeam;i++){const s=document.createElement('div');s.className='ban-slot'+(i<bans.length?' filled':' empty');s.textContent=i<bans.length?bans[i]:'—';if(i<bans.length)s.title=bans[i];c.appendChild(s);}}
 function renderTeamPicks(team){const c=document.getElementById(`${team}Picks`);if(!c)return;const picks=state.picks[team]||[];c.innerHTML='';for(let i=0;i<config.picksPerTeam;i++){const s=document.createElement('div');s.className='pick-slot';if(i<picks.length){s.className+=` filled ${team}-pick`;const u=getHeroImageUrl(picks[i]);if(u)s.style.backgroundImage=`url(${u})`;s.innerHTML=`<span>${picks[i]}</span>`;s.title=picks[i];}else{s.className+=' empty';s.textContent='ПУСТО';}s.dataset.slot=`${team}-${i}`;c.appendChild(s);}}
 
-function renderCaptainBar(){const rE=document.getElementById('radiantCaptainEmpty'),rF=document.getElementById('radiantCaptainFilled'),rN=document.getElementById('radiantCaptainName');const dE=document.getElementById('direCaptainEmpty'),dF=document.getElementById('direCaptainFilled'),dN=document.getElementById('direCaptainName');if(state.captains.radiant){rE.classList.add('hidden');rF.classList.remove('hidden');rN.textContent=state.captains.radiant.name;}else{rE.classList.remove('hidden');rF.classList.add('hidden');}if(state.captains.dire){dE.classList.add('hidden');dF.classList.remove('hidden');dN.textContent=state.captains.dire.name;}else{dE.classList.remove('hidden');dF.classList.add('hidden');}}
+function renderCaptainBar(){
+    if(!state.captains) state.captains = {radiant:null,dire:null};
+    const rE=document.getElementById('radiantCaptainEmpty'),rF=document.getElementById('radiantCaptainFilled'),rN=document.getElementById('radiantCaptainName');
+    const dE=document.getElementById('direCaptainEmpty'),dF=document.getElementById('direCaptainFilled'),dN=document.getElementById('direCaptainName');
+    if(state.captains.radiant){rE.classList.add('hidden');rF.classList.remove('hidden');rN.textContent=state.captains.radiant.name;}
+    else{rE.classList.remove('hidden');rF.classList.add('hidden');}
+    if(state.captains.dire){dE.classList.add('hidden');dF.classList.remove('hidden');dN.textContent=state.captains.dire.name;}
+    else{dE.classList.remove('hidden');dF.classList.add('hidden');}
+}
 
 function updateAttrCounts(){const m={strCount:'strength',agiCount:'agility',intCount:'intelligence',uniCount:'universal'};for(const[id,attr]of Object.entries(m)){const e=document.getElementById(id);if(e)e.textContent=`${(state.availableHeroes[attr]||[]).length}/${config.heroesPerAttribute}`;}}
 function updateGameBadge(){document.getElementById('gameBadge').textContent=`Игра ${state.currentGame}`;}

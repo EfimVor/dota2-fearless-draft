@@ -1,7 +1,7 @@
 {
-  "_comment": "force rebuild 2",
+  "_comment": "force rebuild 3 - captains fix",
   "name": "dota2-fearless-draft",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Dota 2 Fearless Draft — мультиплеерный драфт героев через интернет",
   "main": "server.js",
   "scripts": {
