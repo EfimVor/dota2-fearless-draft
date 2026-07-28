@@ -1,5 +1,5 @@
 /**
- * Dota 2 — Fearless Draft Client (v9 – исправлена синтаксическая ошибка)
+ * Dota 2 — Fearless Draft Client (v10 — исправлен синтаксис)
  * Мультиплеер через WebSocket. Таймеры 30с + 2:10 резерв.
  */
 
@@ -590,25 +590,24 @@ function renderHistoryPanel(){
     let html = '';
     const reversed = [...state.seriesHistory].reverse();
     reversed.forEach(game => {
-        html += `<div class="history-game">
-            <div class="history-game-number">Игра ${game.gameNumber}</div>`;
+        html += '<div class="history-game"><div class="history-game-number">Игра ' + game.gameNumber + '</div>';
         if (game.picks && game.picks.radiant && game.picks.radiant.length > 0) {
-            html += `<div class="history-team-row"><span class="history-team-label radiant">R</span>`;
+            html += '<div class="history-team-row"><span class="history-team-label radiant">R</span>';
             game.picks.radiant.forEach(hero => {
                 const img = getHeroImageUrl(hero);
-                html += `<div class="history-hero-icon" style="background-image:url(${img})" title="${hero}"></div>`;
+                html += '<div class="history-hero-icon" style="background-image:url(' + img + ')" title="' + hero + '"></div>';
             });
-            html += `</div>`;
+            html += '</div>';
         }
         if (game.picks && game.picks.dire && game.picks.dire.length > 0) {
-            html += `<div class="history-team-row"><span class="history-team-label dire">D</span>`;
+            html += '<div class="history-team-row"><span class="history-team-label dire">D</span>';
             game.picks.dire.forEach(hero => {
                 const img = getHeroImageUrl(hero);
-                html += `<div class="history-hero-icon" style="background-image:url(${img})" title="${hero}"></div>`;
+                html += '<div class="history-hero-icon" style="background-image:url(' + img + ')" title="' + hero + '"></div>';
             });
-            html += `</div>`;
+            html += '</div>';
         }
-        html += `</div>`;
+        html += '</div>';
     });
     list.innerHTML = html;
 }
@@ -690,146 +689,4 @@ function updateButtons(){
 }
 
 // ==================== MODALS ====================
-function showSettingsModal(){
-    document.getElementById('settingHeroesPerAttr').value=config.heroesPerAttribute;
-    document.getElementById('settingBansPerTeam').value=config.bansPerTeam;
-    document.getElementById('settingPicksPerTeam').value=config.picksPerTeam;
-    document.getElementById('settingBanOrder').value=config.banOrder.join(',');
-    document.getElementById('settingPickOrder').value=config.pickOrder.join(',');
-    document.getElementById('settingsModal').classList.remove('hidden');
-}
-function hideSettingsModal(){document.getElementById('settingsModal')?.classList.add('hidden');}
-function applySettings(){
-    const hpa=Math.max(5,Math.min(15,parseInt(document.getElementById('settingHeroesPerAttr').value)||10));
-    const bpt=Math.max(1,Math.min(5,parseInt(document.getElementById('settingBansPerTeam').value)||3));
-    const ppt=Math.max(3,Math.min(5,parseInt(document.getElementById('settingPicksPerTeam').value)||5));
-    const bo=(document.getElementById('settingBanOrder').value||'R,D,R,D,R,D').split(',').map(s=>s.trim().toLowerCase());
-    const po=(document.getElementById('settingPickOrder').value||'R,D,D,R,R,D,D,R,R,D').split(',').map(s=>s.trim().toLowerCase());
-    const pt=s=>s==='r'||s==='radiant'?'radiant':s==='d'||s==='dire'?'dire':null;
-    const bo2=bo.map(pt).filter(Boolean),po2=po.map(pt).filter(Boolean);
-    if(bo2.length!==bpt*2){showToast(`Порядок банов: ровно ${bpt*2} элементов!`,'error');return;}
-    if(po2.length!==ppt*2){showToast(`Порядок пиков: ровно ${ppt*2} элементов!`,'error');return;}
-    config.heroesPerAttribute=hpa;config.bansPerTeam=bpt;config.picksPerTeam=ppt;
-    config.banOrder=bo2;config.pickOrder=po2;
-    hideSettingsModal();
-    if(state.seriesStarted)startNewSeries();
-    showToast('Настройки применены!','success');
-}
-
-function showHistoryModal(){
-    const c=document.getElementById('historyContent');if(!c)return;
-    if(state.seriesHistory.length===0&&state.currentGameBans.length===0&&state.currentGamePicks.length===0){
-        c.innerHTML='<p class="text-muted">Серия ещё не начата.</p>';
-    }else{
-        let h='<div style="display:flex;flex-direction:column;gap:14px;">';
-        state.seriesHistory.forEach(g=>{
-            h+=`<div style="border:1px solid var(--border-color);border-radius:8px;padding:12px;">
-                <h4 style="margin-bottom:8px;">Игра ${g.gameNumber}</h4>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong>
-                        <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${g.bans?.radiant?.join(', ')||'—'}</div>
-                        <div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${g.picks?.radiant?.join(', ')||'—'}</div>
-                    </div>
-                    <div><strong style="color:var(--dire-color);">💀 Dire</strong>
-                        <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${g.bans?.dire?.join(', ')||'—'}</div>
-                        <div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${g.picks?.dire?.join(', ')||'—'}</div>
-                    </div>
-                </div>
-            </div>`;
-        });
-        if((state.currentGameBans.length>0||state.currentGamePicks.length>0)&&
-           !state.seriesHistory.some(g=>g.gameNumber===state.currentGame)){
-            h+=`<div style="border:1px solid var(--accent-blue);border-radius:8px;padding:12px;opacity:0.8;">
-                <h4 style="margin-bottom:8px;">Игра ${state.currentGame} (текущая)</h4>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong>
-                        <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${state.bans.radiant.join(', ')||'—'}</div>
-                        <div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${state.picks.radiant.join(', ')||'—'}</div>
-                    </div>
-                    <div><strong style="color:var(--dire-color);">💀 Dire</strong>
-                        <div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> ${state.bans.dire.join(', ')||'—'}</div>
-                        <div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> ${state.picks.dire.join(', ')||'—'}</div>
-                    </div>
-                </div>
-            </div>`;
-        }
-        h+='</div>';c.innerHTML=h;
-    }
-    document.getElementById('historyModal').classList.remove('hidden');
-}
-function hideHistoryModal(){document.getElementById('historyModal')?.classList.add('hidden');}
-
-function showSeriesBannedModal(){
-    const c=document.getElementById('seriesBannedContent');if(!c)return;
-    if(state.seriesBannedHeroes.length===0){c.innerHTML='<p class="text-muted">Пока нет заблокированных героев.</p>';}
-    else{
-        let h='<div class="series-banned-grid">';
-        [...state.seriesBannedHeroes].sort().forEach(hero=>{
-            const u=getHeroImageUrl(hero);
-            const gf=state.seriesHistory.find(g=>g.picks?.radiant?.includes(hero)||g.picks?.dire?.includes(hero));
-            const gn=gf?gf.gameNumber:'?';
-            h+=`<div class="series-banned-hero">
-                <div class="sb-avatar" style="background-image:url(${u})"></div>
-                <div class="sb-info"><span class="sb-name">${hero}</span><span class="sb-game">Игра ${gn}</span></div>
-            </div>`;
-        });
-        h+='</div>';c.innerHTML=h;
-    }
-    document.getElementById('seriesBannedModal').classList.remove('hidden');
-}
-function hideSeriesBannedModal(){document.getElementById('seriesBannedModal')?.classList.add('hidden');}
-
-function showToast(msg,type='info'){
-    const c=document.getElementById('toastContainer');if(!c)return;
-    const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;
-    c.appendChild(t);setTimeout(()=>t.remove(),2500);
-}
-
-function createParticles(){
-    const c=document.getElementById('bgParticles');if(!c)return;
-    for(let i=0;i<20;i++){
-        const p=document.createElement('div');p.className='particle';
-        p.style.left=Math.random()*100+'%';
-        p.style.animationDelay=Math.random()*6+'s';
-        p.style.animationDuration=(5+Math.random()*8)+'s';
-        p.style.width=p.style.height=(1+Math.random()*2)+'px';
-        c.appendChild(p);
-    }
-}
-
-// ==================== EVENT LISTENERS ====================
-document.addEventListener('DOMContentLoaded',()=>{
-    createParticles();
-    connectWebSocket();
-
-    document.getElementById('btnCreateRoom').addEventListener('click',createRoom);
-    document.getElementById('btnJoinRoom').addEventListener('click',()=>joinRoom());
-    document.getElementById('btnCopyLink').addEventListener('click',copyInviteLink);
-    document.getElementById('joinRoomInput').addEventListener('keydown',(e)=>{if(e.key==='Enter')joinRoom();});
-
-    document.getElementById('btnClaimRadiant').addEventListener('click',()=>claimCaptain('radiant'));
-    document.getElementById('btnClaimDire').addEventListener('click',()=>claimCaptain('dire'));
-    document.getElementById('btnLeaveRadiant').addEventListener('click',()=>leaveCaptain('radiant'));
-    document.getElementById('btnLeaveDire').addEventListener('click',()=>leaveCaptain('dire'));
-    document.getElementById('btnCaptainNameConfirm').addEventListener('click',confirmCaptainName);
-    document.getElementById('btnCaptainNameCancel').addEventListener('click',()=>{document.getElementById('captainNameModal').classList.add('hidden');pendingCaptainTeam=null;});
-    document.getElementById('captainNameInput').addEventListener('keydown',(e)=>{if(e.key==='Enter')confirmCaptainName();});
-
-    document.getElementById('btnNewSeries').addEventListener('click',startNewSeries);
-    document.getElementById('btnNextGame').addEventListener('click',nextGame);
-    document.getElementById('btnUndo').addEventListener('click',undoLastAction);
-
-    document.getElementById('btnStartRadiant').addEventListener('click',()=>{
-        document.getElementById('startSideModal').classList.add('hidden');
-        doStartNewSeries('radiant');
-    });
-    document.getElementById('btnStartDire').addEventListener('click',()=>{
-        document.getElementById('startSideModal').classList.add('hidden');
-        doStartNewSeries('dire');
-    });
-    document.getElementById('btnStartSideCancel').addEventListener('click',()=>{
-        document.getElementById('startSideModal').classList.add('hidden');
-    });
-
-    document.getElementById('btnSettings').addEventListener('click',showSettingsModal);
-    document.getElementById('btnSettingsClose').addEventListener('
+function showSettings
