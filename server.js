@@ -211,7 +211,16 @@ wss.on('connection', (ws, req) => {
                 for (const w of currentRoom.players) {
                     if (w.readyState === 1) w.send(JSON.stringify(stateMsg));
                 }
-                console.log(`Состояние синхронизировано в комнате ${currentRoom.code}`);
+                break;
+            }
+
+            case 'TIMER_SYNC': {
+                if (!currentRoom) return;
+                // Пересылаем данные таймера всем, кроме отправителя
+                broadcastToRoom(currentRoom, {
+                    type: 'TIMER_TICK',
+                    timerData: msg.timerData
+                }, ws);
                 break;
             }
 

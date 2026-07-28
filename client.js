@@ -1,5 +1,5 @@
 /**
- * Dota 2 — Fearless Draft Client (v5 – плавный таймер, баны с картинками, без выбора победителя)
+ * Dota 2 — Fearless Draft Client (v6 – плавный таймер у соперника, красивые баны)
  * Мультиплеер через WebSocket. Таймеры 30с + 2:10 резерв.
  */
 
@@ -193,7 +193,7 @@ function startTurnTimer(team) {
         }
         updateTimerDisplay();
 
-        // Отправляем таймер каждую секунду для плавного отображения у соперника
+        // Отправляем таймер каждую секунду (сервер теперь умеет пересылать TIMER_SYNC)
         if (roomCode && !isRemoteAction) {
             sendMessage({
                 type: 'TIMER_SYNC',
@@ -342,7 +342,6 @@ function applyPickLocally(hero,attribute,team){
     if(state.step>=totalPicks()){
         state.phase='complete';
         stopTurnTimer();
-        // Сразу синхронизируем завершение
         syncGameState();
     }else{
         state.currentTurn=getPickStepTeam(state.step);
@@ -493,8 +492,13 @@ function renderTeamBans(team){
         if(i<bans.length){
             s.className+=' filled';
             const imgUrl=getHeroImageUrl(bans[i]);
-            if(imgUrl) s.style.backgroundImage=`url(${imgUrl})`;
-            // Добавляем название героя для тултипа
+            if(imgUrl) {
+                s.style.backgroundImage = `url(${imgUrl})`;
+                s.style.backgroundSize = 'cover';
+                s.style.backgroundPosition = 'center 20%';
+            } else {
+                s.style.background = getAttrBg('strength'); // fallback
+            }
             s.title=bans[i];
         }else{
             s.className+=' empty';
@@ -590,9 +594,6 @@ function updateButtons(){
 }
 
 // ==================== MODALS ====================
-// Модалка победителя больше не используется
-function hideWinnerModal(){document.getElementById('winnerModal')?.classList.add('hidden');}
-
 function showSettingsModal(){
     document.getElementById('settingHeroesPerAttr').value=config.heroesPerAttribute;
     document.getElementById('settingBansPerTeam').value=config.bansPerTeam;
@@ -601,9 +602,7 @@ function showSettingsModal(){
     document.getElementById('settingPickOrder').value=config.pickOrder.join(',');
     document.getElementById('settingsModal').classList.remove('hidden');
 }
-
 function hideSettingsModal(){document.getElementById('settingsModal')?.classList.add('hidden');}
-
 function applySettings(){
     const hpa=Math.max(5,Math.min(15,parseInt(document.getElementById('settingHeroesPerAttr').value)||10));
     const bpt=Math.max(1,Math.min(5,parseInt(document.getElementById('settingBansPerTeam').value)||3));
@@ -662,7 +661,6 @@ function showHistoryModal(){
     }
     document.getElementById('historyModal').classList.remove('hidden');
 }
-
 function hideHistoryModal(){document.getElementById('historyModal')?.classList.add('hidden');}
 
 function showSeriesBannedModal(){
@@ -683,7 +681,6 @@ function showSeriesBannedModal(){
     }
     document.getElementById('seriesBannedModal').classList.remove('hidden');
 }
-
 function hideSeriesBannedModal(){document.getElementById('seriesBannedModal')?.classList.add('hidden');}
 
 function showToast(msg,type='info'){
@@ -736,7 +733,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.getElementById('btnSeriesBanned').addEventListener('click',showSeriesBannedModal);
     document.getElementById('btnSeriesBannedClose').addEventListener('click',hideSeriesBannedModal);
 
-    // Кнопки победителя скрыты за ненадобностью
     document.querySelectorAll('.modal-overlay').forEach(ov=>{
         ov.addEventListener('click',(e)=>{
             if(e.target===ov){

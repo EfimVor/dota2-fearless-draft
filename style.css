@@ -208,9 +208,17 @@ body {
 .pick-label { color: var(--accent-blue); }
 
 .ban-slots { display: flex; gap: 4px; margin-bottom: 6px; }
-.ban-slot { flex: 1; height: 32px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; border: 1px dashed var(--border-color); transition: all var(--transition-normal); }
+.ban-slot {
+    flex: 1; height: 50px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 700; border: 1px dashed var(--border-color);
+    transition: all var(--transition-normal); position: relative; overflow: hidden;
+    background-size: cover; background-position: center 20%;
+}
 .ban-slot.empty { background: var(--bg-tertiary); color: var(--text-muted); font-size: 0.55rem; }
-.ban-slot.filled { background: var(--ban-bg); border-color: rgba(244,67,54,0.6); color: #f44336; cursor: default; }
+.ban-slot.filled {
+    border-style: solid; cursor: default; border-color: rgba(244,67,54,0.6);
+    box-shadow: inset 0 0 20px rgba(244,67,54,0.3);
+}
 
 .team-picks { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .pick-slot {
@@ -343,7 +351,6 @@ body {
 .modal { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; min-width: 400px; max-width: 90vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.7); }
 .modal-wide { min-width: 550px; }
 .modal-sm { min-width: 320px; }
-.winner-modal { text-align: center; }
 .modal-title { font-size: 1.15rem; font-weight: 800; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); letter-spacing: 0.3px; }
 .modal-body { margin-bottom: 16px; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 8px; }
@@ -352,8 +359,6 @@ body {
 .setting-input { width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem; font-family: inherit; }
 .setting-input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(77,107,254,0.15); }
 .setting-group small { display: block; font-size: 0.65rem; color: var(--text-muted); margin-top: 3px; }
-.winner-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.winner-btn-icon { font-size: 1.6rem; }
 .text-muted { color: var(--text-muted); text-align: center; padding: 20px; font-size: 0.85rem; }
 
 .phase-tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; margin-right: 4px; }
@@ -372,30 +377,4 @@ body {
 .toast.success { border-left: 3px solid var(--agi-color); }
 .toast.error { border-left: 3px solid #f44336; }
 .toast.info { border-left: 3px solid var(--accent-blue); }
-@keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
-
-@media (max-width: 1300px) { .team-panel { width: 180px; } }
-@media (max-width: 1000px) {
-    .main-content { flex-direction: column; }
-    .team-panel { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 6px; padding: 8px; }
-    .team-panel-header { width: 100%; padding-bottom: 3px; }
-    .phase-section { display: flex; align-items: center; gap: 6px; }
-    .ban-slots, .team-picks { flex-direction: row; gap: 3px; }
-    .ban-slot { width: 32px; height: 32px; }
-    .pick-slot { flex: 1; min-width: 0; height: 40px; font-size: 0.65rem; }
-    .hero-pool { flex-direction: column; }
-    .hero-grid { grid-template-columns: repeat(5, 1fr); max-height: 140px; }
-    .hero-card { min-height: 45px; }
-}
-@media (max-width: 600px) {
-    .header { flex-wrap: wrap; gap: 6px; padding: 6px 10px; }
-    .header-center { order: 3; width: 100%; }
-    .captain-bar { flex-direction: column; gap: 6px; }
-    .captain-slot { max-width: 100%; }
-    .hero-grid { grid-template-columns: repeat(3, 1fr); }
-    .footer-controls { flex-wrap: wrap; gap: 5px; padding: 6px 10px; }
-    .footer-center { order: -1; width: 100%; }
-    .modal { min-width: auto; width: 95vw; padding: 16px; }
-    .connection-bar { flex-direction: column; }
-}
+@keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1

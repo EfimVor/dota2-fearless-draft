@@ -1,17 +1,2 @@
 {
-  "_comment": "build 5 - smooth timer, ban images, no winner modal",
-  "name": "dota2-fearless-draft",
-  "version": "2.1.0",
-  "description": "Dota 2 Fearless Draft",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "ws": "^8.16.0"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "license": "MIT"
-}
+  "_
