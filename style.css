@@ -314,30 +314,28 @@ body {
 .intelligence .hero-attr-badge { background: rgba(77,166,255,0.15); color: var(--int-color); }
 .universal .hero-attr-badge { background: rgba(180,93,232,0.15); color: var(--uni-color); }
 
-/* ===== History Panel (Draft picks summary) ===== */
-.history-panel {
-    width: 170px; flex-shrink: 0; display: flex; flex-direction: column;
-    background: var(--bg-glass); backdrop-filter: blur(12px); border-radius: var(--radius-lg);
-    padding: 6px; border: 1px solid var(--border-color);
-    max-height: 100%; overflow-y: auto;
+/* ===== Bottom History Section ===== */
+.history-section {
+    background: var(--bg-glass); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border-color); padding: 8px 16px;
+    z-index: 10; position: relative; max-height: 180px; overflow-y: auto;
 }
-.history-header {
-    display: flex; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--border-color);
-    margin-bottom: 4px;
+.history-header { display: flex; align-items: center; margin-bottom: 6px; }
+.history-title { font-size: 0.8rem; font-weight: 800; color: var(--text-secondary); letter-spacing: 1px; }
+.history-scroll { display: flex; gap: 10px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+.history-scroll::-webkit-scrollbar { height: 4px; }
+.history-scroll::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+.history-game-card {
+    flex-shrink: 0; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); padding: 8px 12px; min-width: 200px;
 }
-.history-title { font-size: 0.7rem; font-weight: 800; color: var(--text-secondary); letter-spacing: 0.3px; }
-.history-list { display: flex; flex-direction: column; gap: 6px; }
-.history-game {
-    border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px;
-    background: var(--bg-tertiary);
-}
-.history-game-number { font-size: 0.6rem; font-weight: 800; color: var(--text-muted); margin-bottom: 3px; }
-.history-team-row { display: flex; align-items: center; gap: 2px; margin-bottom: 2px; }
-.history-team-label { font-size: 0.55rem; font-weight: 700; width: 28px; text-align: right; margin-right: 2px; }
+.history-game-num { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); margin-bottom: 4px; }
+.history-team-row { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+.history-team-label { font-size: 0.65rem; font-weight: 700; width: 24px; text-align: right; margin-right: 4px; }
 .history-team-label.radiant { color: var(--radiant-color); }
 .history-team-label.dire { color: var(--dire-color); }
 .history-hero-icon {
-    width: 22px; height: 22px; border-radius: 3px; background-size: cover; background-position: center 20%;
+    width: 32px; height: 32px; border-radius: 4px; background-size: cover; background-position: center 20%;
     border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0;
 }
 
@@ -409,7 +407,6 @@ body {
 
 @media (max-width: 1200px) {
     .team-panel { width: 160px; }
-    .history-panel { width: 140px; }
     .hero-card { min-height: 42px; }
     .pick-slot { height: 36px; }
     .ban-slot { height: 36px; }
@@ -424,7 +421,6 @@ body {
     .hero-pool { flex-direction: column; }
     .hero-grid { grid-template-columns: repeat(5, 1fr); max-height: 120px; }
     .hero-card { min-height: 38px; }
-    .history-panel { width: 100%; max-height: 120px; }
 }
 @media (max-width: 600px) {
     .header { flex-wrap: wrap; gap: 4px; padding: 4px 8px; }
