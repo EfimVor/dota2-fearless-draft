@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dota 2 — Fearless Draft</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🗡️</text></svg>">
 </head>
 <body>
@@ -305,7 +305,7 @@
     <footer class="footer-controls">
         <button class="btn btn-glass" id="btnUndo" disabled>↩ Отменить</button>
         <div class="footer-center">
-            <div class="timer-container" id="timerContainer">
+            <div class="timer-container" id="timerContainer" style="display: none;">
                 <div class="timer-main" id="timerMain">00:30</div>
                 <div class="timer-reserve" id="timerReserve">+2:10</div>
             </div>
@@ -320,6 +320,6 @@
     <!-- Hidden copy helper -->
     <input type="text" id="copyHelper" style="position:absolute;left:-9999px;" aria-hidden="true">
 
-    <script src="client.js"></script>
+    <script src="client.js?v=2"></script>
 </body>
 </html>
