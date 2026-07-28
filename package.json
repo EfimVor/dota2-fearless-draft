@@ -1,2 +1,16 @@
 {
-  "name": "d
+  "name": "dota2-fearless-draft",
+  "version": "2.3.1",
+  "description": "Dota 2 Fearless Draft",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
