@@ -1,4 +1,5 @@
 {
+  "_comment": "force rebuild 1",
   "name": "dota2-fearless-draft",
   "version": "2.0.0",
   "description": "Dota 2 Fearless Draft — мультиплеерный драфт героев через интернет",
