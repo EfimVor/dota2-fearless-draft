@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dota 2 — Fearless Draft</title>
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=4">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🗡️</text></svg>">
 </head>
 <body>
@@ -107,6 +107,25 @@
         </div>
     </div>
 
+    <!-- Choose Starting Side Modal -->
+    <div class="modal-overlay hidden" id="startSideModal">
+        <div class="modal">
+            <h2 class="modal-title">Кто начинает?</h2>
+            <p style="text-align:center;color:var(--text-secondary);margin-bottom:16px;">Выберите, какая команда будет банить и пикать первой</p>
+            <div class="modal-body" style="display:flex;gap:12px;justify-content:center;">
+                <button class="btn btn-radiant btn-lg" id="btnStartRadiant">
+                    <span>🏛️ Radiant</span>
+                </button>
+                <button class="btn btn-dire btn-lg" id="btnStartDire">
+                    <span>💀 Dire</span>
+                </button>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button class="btn btn-outline" id="btnStartSideCancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div class="modal-overlay hidden" id="settingsModal">
         <div class="modal">
@@ -164,24 +183,6 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" id="btnSeriesBannedClose">Закрыть</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Winner Selection Modal -->
-    <div class="modal-overlay hidden" id="winnerModal">
-        <div class="modal winner-modal">
-            <h2 class="modal-title">🏆 Кто победил в Игре <span id="winnerGameNum">1</span>?</h2>
-            <div class="modal-body winner-buttons">
-                <button class="btn btn-radiant btn-xl" id="btnRadiantWin">
-                    <span class="winner-btn-icon">🏛️</span>
-                    <span>Radiant</span>
-                </button>
-                <button class="btn btn-dire btn-xl" id="btnDireWin">
-                    <span class="winner-btn-icon">💀</span>
-                    <span>Dire</span>
-                </button>
-                <button class="btn btn-ghost" id="btnSkipWinner">Пропустить</button>
             </div>
         </div>
     </div>
@@ -299,6 +300,16 @@
                 <span class="pulse-dot"></span> Ваш ход
             </div>
         </aside>
+
+        <!-- History Panel (Draft picks summary) -->
+        <aside class="history-panel" id="historyPanel">
+            <div class="history-header">
+                <span class="history-title">📋 Пики серии</span>
+            </div>
+            <div class="history-list" id="historyList">
+                <p class="text-muted">Нет завершённых игр</p>
+            </div>
+        </aside>
     </main>
 
     <!-- Bottom Controls with Timer -->
@@ -320,6 +331,6 @@
     <!-- Hidden copy helper -->
     <input type="text" id="copyHelper" style="position:absolute;left:-9999px;" aria-hidden="true">
 
-    <script src="client.js?v=2"></script>
+    <script src="client.js?v=4"></script>
 </body>
 </html>
