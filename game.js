@@ -1,4 +1,4 @@
-/* Dota 2 Fearless Draft - Game Logic (v19) */
+/* Dota 2 Fearless Draft - Game Logic (v21 complete) */
 var ALL_HEROES = {
     strength: ["Abaddon","Alchemist","Axe","Bristleback","Centaur Warrunner","Chaos Knight","Dawnbreaker","Doom","Dragon Knight","Earth Spirit","Earthshaker","Elder Titan","Huskar","Kunkka","Legion Commander","Lifestealer","Mars","Night Stalker","Ogre Magi","Omniknight","Primal Beast","Pudge","Sand King","Slardar","Sven","Tidehunter","Timbersaw","Tiny","Treant Protector","Tusk","Underlord","Undying","Wraith King"],
     agility: ["Anti-Mage","Arc Warden","Bloodseeker","Bounty Hunter","Clinkz","Drow Ranger","Ember Spirit","Faceless Void","Gyrocopter","Hoodwink","Juggernaut","Kez","Luna","Medusa","Meepo","Monkey King","Morphling","Muerta","Naga Siren","Nyx Assassin","Phantom Assassin","Phantom Lancer","Razor","Riki","Shadow Fiend","Slark","Sniper","Spectre","Templar Assassin","Terrorblade","Troll Warlord","Ursa","Viper","Weaver"],
@@ -14,9 +14,7 @@ function attrLabel(a){var l={strength:"Сила",agility:"Ловкость",inte
 var CFG={heroesPerAttribute:9,bansPerTeam:3,picksPerTeam:5,banOrder:["radiant","dire","radiant","dire","radiant","dire"],pickOrder:["radiant","dire","dire","radiant","radiant","dire","dire","radiant","radiant","dire"]};
 
 var ws=null,roomCode=null,svCaptains={radiant:null,dire:null},isRemote=false;
-var myTeam=sessionStorage.getItem("myTeam")||null;
-
-function saveMyTeam(){if(myTeam)sessionStorage.setItem("myTeam",myTeam);else sessionStorage.removeItem("myTeam");}
+var myTeam=null;
 
 function connect(){
     if(ws&&ws.readyState===WebSocket.OPEN)return;
@@ -57,14 +55,12 @@ function syncCaps(){
     var rE=el("radiantCaptainEmpty"),rF=el("radiantCaptainFilled"),rN=el("radiantCaptainName");
     var dE=el("direCaptainEmpty"),dF=el("direCaptainFilled"),dN=el("direCaptainName");
     if(svCaptains.radiant){
-        if(myTeam==="radiant"){rE.classList.add("hidden");rF.classList.remove("hidden");rN.textContent=svCaptains.radiant;}
-        else{rE.classList.add("hidden");rF.classList.remove("hidden");rN.textContent=svCaptains.radiant;rF.style.opacity="0.7";}
+        rE.classList.add("hidden");rF.classList.remove("hidden");rN.textContent=svCaptains.radiant;
     } else {
         rE.classList.remove("hidden");rF.classList.add("hidden");
     }
     if(svCaptains.dire){
-        if(myTeam==="dire"){dE.classList.add("hidden");dF.classList.remove("hidden");dN.textContent=svCaptains.dire;}
-        else{dE.classList.add("hidden");dF.classList.remove("hidden");dN.textContent=svCaptains.dire;dF.style.opacity="0.7";}
+        dE.classList.add("hidden");dF.classList.remove("hidden");dN.textContent=svCaptains.dire;
     } else {
         dE.classList.remove("hidden");dF.classList.add("hidden");
     }
@@ -137,8 +133,8 @@ function totalPicks(){return CFG.picksPerTeam*2;}
 var pendingCap=null;
 var pendingNextGame=false;
 function claimCaptain(team){if(!roomCode){toast("Сначала подключитесь!","error");return;}if(svCaptains[team]){toast("Капитан уже выбран","error");return;}pendingCap=team;el("captainNameModal").classList.remove("hidden");el("captainNameInput").value="";el("captainNameInput").focus();}
-function confirmCapName(){var input=el("captainNameInput");var name=input.value.trim()||("Капитан "+(pendingCap==="radiant"?"Radiant":"Dire"));var team=pendingCap;el("captainNameModal").classList.add("hidden");pendingCap=null;myTeam=team;saveMyTeam();send({type:"CLAIM_CAPTAIN",team:team,name:name});svCaptains[team]=name;syncCaps();refresh();toast("Вы стали капитаном "+(team==="radiant"?"Radiant":"Dire")+"!","success");}
-function leaveCaptain(team){if(myTeam!==team)return;myTeam=null;saveMyTeam();send({type:"LEAVE_CAPTAIN",team:team});svCaptains[team]=null;syncCaps();refresh();}
+function confirmCapName(){var input=el("captainNameInput");var name=input.value.trim()||("Капитан "+(pendingCap==="radiant"?"Radiant":"Dire"));var team=pendingCap;el("captainNameModal").classList.add("hidden");pendingCap=null;myTeam=team;send({type:"CLAIM_CAPTAIN",team:team,name:name});svCaptains[team]=name;syncCaps();refresh();toast("Вы стали капитаном "+(team==="radiant"?"Radiant":"Dire")+"!","success");}
+function leaveCaptain(team){if(myTeam!==team)return;myTeam=null;send({type:"LEAVE_CAPTAIN",team:team});svCaptains[team]=null;syncCaps();refresh();}
 function startNewSeries(){if(!myTeam&&game.seriesStarted){toast("Только капитан может начать","error");return;}if(!game.seriesStarted||game.phase==="complete"){el("startSideModal").classList.remove("hidden");}else{doStart(CFG.banOrder[0]);}}
 function doStart(side){
     if(side==="dire"){CFG.banOrder=["dire","radiant","dire","radiant","dire","radiant"];CFG.pickOrder=["dire","radiant","radiant","dire","dire","radiant","radiant","dire","dire","radiant"];}
@@ -253,7 +249,19 @@ function updateButtons(){var u=el("btnUndo"),n=el("btnNextGame");var has=(game.p
 
 function showSettings(){el("settingHeroesPerAttr").value=CFG.heroesPerAttribute;el("settingBansPerTeam").value=CFG.bansPerTeam;el("settingPicksPerTeam").value=CFG.picksPerTeam;el("settingBanOrder").value=CFG.banOrder.join(",");el("settingPickOrder").value=CFG.pickOrder.join(",");el("settingsModal").classList.remove("hidden");}
 function hideSettings(){el("settingsModal").classList.add("hidden");}
-function applySettings(){var hpa=Math.max(5,Math.min(15,parseInt(el("settingHeroesPerAttr").value)||10));var bpt=Math.max(1,Math.min(5,parseInt(el("settingBansPerTeam").value)||3));var ppt=Math.max(3,Math.min(5,parseInt(el("settingPicksPerTeam").value)||5));var br=(el("settingBanOrder").value||"R,D,R,D,R,D").split(",").map(function(s){var t=s.trim().toLowerCase();if(t==="r"||t==="radiant")return"radiant";if(t==="d"||t==="dire")return"dire";return null;}).filter(Boolean);var pr=(el("settingPickOrder").value||"R,D,D,R,R,D,D,R,R,D").split(",").map(function(s){var t=s.trim().toLowerCase();if(t==="r"||t==="radiant")return"radiant";if(t==="d"||t==="dire")return"dire";return null;}).filter(Boolean);if(br.length!==bpt*2){toast("Баны: ровно "+(bpt*2)+" элементов!","error");return;}if(pr.length!==ppt*2){toast("Пики: ровно "+(ppt*2)+" элементов!","error");return;}CFG.heroesPerAttribute=hpa;CFG.bansPerTeam=bpt;CFG.picksPerTeam=ppt;CFG.banOrder=br;CFG.pickOrder=pr;hideSettings();if(game.seriesStarted)startNewSeries();toast("Настройки применены!","success");}
+function applySettings(){
+    var hpa=Math.max(5,Math.min(15,parseInt(el("settingHeroesPerAttr").value)||10));
+    var bpt=Math.max(1,Math.min(5,parseInt(el("settingBansPerTeam").value)||3));
+    var ppt=Math.max(3,Math.min(5,parseInt(el("settingPicksPerTeam").value)||5));
+    var br=(el("settingBanOrder").value||"R,D,R,D,R,D").split(",").map(function(s){var t=s.trim().toLowerCase();if(t==="r"||t==="radiant")return"radiant";if(t==="d"||t==="dire")return"dire";return null;}).filter(Boolean);
+    var pr=(el("settingPickOrder").value||"R,D,D,R,R,D,D,R,R,D").split(",").map(function(s){var t=s.trim().toLowerCase();if(t==="r"||t==="radiant")return"radiant";if(t==="d"||t==="dire")return"dire";return null;}).filter(Boolean);
+    if(br.length!==bpt*2){toast("Баны: ровно "+(bpt*2)+" элементов!","error");return;}
+    if(pr.length!==ppt*2){toast("Пики: ровно "+(ppt*2)+" элементов!","error");return;}
+    CFG.heroesPerAttribute=hpa;CFG.bansPerTeam=bpt;CFG.picksPerTeam=ppt;CFG.banOrder=br;CFG.pickOrder=pr;
+    hideSettings();
+    if(game.seriesStarted)startNewSeries();
+    toast("Настройки применены!","success");
+}
 function showHistory(){var c=el("historyContent");if(!c)return;if(game.seriesHistory.length===0&&game.currentGameBans.length===0&&game.currentGamePicks.length===0){c.innerHTML='<p class="text-muted">Серия ещё не начата.</p>';}else{var h='<div style="display:flex;flex-direction:column;gap:14px;">';for(var i=0;i<game.seriesHistory.length;i++){var g=game.seriesHistory[i];h+='<div style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><h4 style="margin-bottom:8px;">Игра '+g.gameNumber+'</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong><div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> '+(g.bans&&g.bans.radiant?g.bans.radiant.join(", "):"—")+'</div><div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> '+(g.picks&&g.picks.radiant?g.picks.radiant.join(", "):"—")+'</div></div><div><strong style="color:var(--dire-color);">💀 Dire</strong><div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> '+(g.bans&&g.bans.dire?g.bans.dire.join(", "):"—")+'</div><div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> '+(g.picks&&g.picks.dire?g.picks.dire.join(", "):"—")+'</div></div></div></div>';}c.innerHTML=h;}el("historyModal").classList.remove("hidden");}
 function hideHistory(){el("historyModal").classList.add("hidden");}
 function showSeriesBanned(){var c=el("seriesBannedContent");if(!c)return;if(game.seriesBannedHeroes.length===0){c.innerHTML='<p class="text-muted">Пока нет заблокированных героев.</p>';}else{var h='<div class="series-banned-grid">';var sorted=game.seriesBannedHeroes.slice().sort();for(var i=0;i<sorted.length;i++){var hero=sorted[i];var img=heroImg(hero);var found=null;for(var j=0;j<game.seriesHistory.length;j++){if((game.seriesHistory[j].picks&&game.seriesHistory[j].picks.radiant&&game.seriesHistory[j].picks.radiant.indexOf(hero)!==-1)||(game.seriesHistory[j].picks&&game.seriesHistory[j].picks.dire&&game.seriesHistory[j].picks.dire.indexOf(hero)!==-1)){found=game.seriesHistory[j];break;}}var gn=found?found.gameNumber:"?";h+='<div class="series-banned-hero"><div class="sb-avatar" style="background-image:url('+img+')"></div><div class="sb-info"><span class="sb-name">'+hero+'</span><span class="sb-game">Игра '+gn+'</span></div></div>';}h+='</div>';c.innerHTML=h;}el("seriesBannedModal").classList.remove("hidden");}
