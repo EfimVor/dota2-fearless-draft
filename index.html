@@ -8,40 +8,285 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🗡️</text></svg>">
 </head>
 <body>
-    <!-- ... unchanged background, connection bar, header, modals ... -->
+    <!-- Animated Background -->
+    <div class="bg-layer">
+        <div class="bg-glow bg-glow-radiant"></div>
+        <div class="bg-glow bg-glow-dire"></div>
+        <div class="bg-particles" id="bgParticles"></div>
+        <div class="bg-rune bg-rune-1">◈</div>
+        <div class="bg-rune bg-rune-2">◆</div>
+        <div class="bg-rune bg-rune-3">◇</div>
+    </div>
+
+    <!-- Connection Panel -->
+    <div class="connection-bar" id="connectionBar">
+        <div class="conn-status" id="connStatus">
+            <span class="conn-dot disconnected"></span>
+            <span class="conn-text" id="connText">Не подключен</span>
+        </div>
+        <div class="conn-actions">
+            <button class="btn btn-primary" id="btnCreateRoom">🎯 Создать комнату</button>
+            <div class="join-group">
+                <input type="text" class="setting-input conn-input" id="joinRoomInput" placeholder="Код комнаты" maxlength="6">
+                <button class="btn btn-glass" id="btnJoinRoom">🔗 Подключиться</button>
+            </div>
+        </div>
+        <div class="conn-info" id="connInfo">
+            <span class="room-code-label">Комната:</span>
+            <span class="room-code-value" id="roomCodeDisplay">—</span>
+            <button class="btn btn-mini btn-copy" id="btnCopyLink" title="Копировать ссылку">📋</button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">🗡️</span>
+                <div class="logo-text-group">
+                    <span class="logo-title">FEARLESS DRAFT</span>
+                    <span class="logo-subtitle">Dota 2</span>
+                </div>
+            </div>
+            <span class="game-badge" id="gameBadge">Игра 1</span>
+            <span class="phase-badge" id="phaseBadge">Ожидание</span>
+        </div>
+        <div class="header-center">
+            <div class="series-score" id="seriesScore">
+                <div class="score-team radiant-score-bg">
+                    <span class="score-icon">🏛️</span>
+                    <span class="score-name">Radiant</span>
+                    <span class="score-value" id="radiantScore">0</span>
+                </div>
+                <div class="score-vs">VS</div>
+                <div class="score-team dire-score-bg">
+                    <span class="score-value" id="direScore">0</span>
+                    <span class="score-name">Dire</span>
+                    <span class="score-icon">💀</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-glass" id="btnSettings" title="Настройки">⚙️</button>
+            <button class="btn btn-glass" id="btnHistory" title="История серии">📋</button>
+            <button class="btn btn-glass" id="btnSeriesBanned" title="Заблокированные герои">🔒</button>
+            <button class="btn btn-danger" id="btnNewSeries">⚔️ Новая серия</button>
+        </div>
+    </header>
+
+    <!-- Captain Selection Bar -->
+    <div class="captain-bar" id="captainBar">
+        <div class="captain-slot radiant-captain-slot" id="radiantCaptainSlot">
+            <div class="captain-empty" id="radiantCaptainEmpty">
+                <button class="btn btn-radiant captain-claim-btn" id="btnClaimRadiant">
+                    🏛️ Стать капитаном Radiant
+                </button>
+            </div>
+            <div class="captain-filled hidden" id="radiantCaptainFilled">
+                <span class="captain-avatar">🏛️</span>
+                <span class="captain-name" id="radiantCaptainName">—</span>
+                <span class="captain-status online">● В комнате</span>
+                <button class="btn-mini btn-leave" id="btnLeaveRadiant">✕</button>
+            </div>
+        </div>
+        <div class="captain-divider">
+            <span class="captain-vs">КАПИТАНЫ</span>
+        </div>
+        <div class="captain-slot dire-captain-slot" id="direCaptainSlot">
+            <div class="captain-empty" id="direCaptainEmpty">
+                <button class="btn btn-dire captain-claim-btn" id="btnClaimDire">
+                    💀 Стать капитаном Dire
+                </button>
+            </div>
+            <div class="captain-filled hidden" id="direCaptainFilled">
+                <span class="captain-avatar">💀</span>
+                <span class="captain-name" id="direCaptainName">—</span>
+                <span class="captain-status online">● В комнате</span>
+                <button class="btn-mini btn-leave" id="btnLeaveDire">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Choose Starting Side Modal -->
+    <div class="modal-overlay hidden" id="startSideModal">
+        <div class="modal">
+            <h2 class="modal-title">Кто начинает?</h2>
+            <p style="text-align:center;color:var(--text-secondary);margin-bottom:16px;">Выберите, какая команда будет банить и пикать первой</p>
+            <div class="modal-body" style="display:flex;gap:12px;justify-content:center;">
+                <button class="btn btn-radiant btn-lg" id="btnStartRadiant">
+                    <span>🏛️ Radiant</span>
+                </button>
+                <button class="btn btn-dire btn-lg" id="btnStartDire">
+                    <span>💀 Dire</span>
+                </button>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button class="btn btn-outline" id="btnStartSideCancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay hidden" id="settingsModal">
+        <div class="modal">
+            <h2 class="modal-title">⚙️ Настройки драфта</h2>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label class="setting-label">Героев на атрибут</label>
+                    <input type="number" class="setting-input" id="settingHeroesPerAttr" value="9" min="5" max="15">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Банов на команду</label>
+                    <input type="number" class="setting-input" id="settingBansPerTeam" value="3" min="1" max="5">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Пиков на команду</label>
+                    <input type="number" class="setting-input" id="settingPicksPerTeam" value="5" min="3" max="5">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Порядок банов (R=Rad, D=Dire)</label>
+                    <input type="text" class="setting-input" id="settingBanOrder" value="R,D,R,D,R,D">
+                    <small>Через запятую: R или D</small>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Порядок пиков</label>
+                    <input type="text" class="setting-input" id="settingPickOrder" value="R,D,D,R,R,D,D,R,R,D">
+                    <small>Через запятую: R или D</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btnSettingsClose">Отмена</button>
+                <button class="btn btn-primary" id="btnSettingsApply">Применить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div class="modal-overlay hidden" id="historyModal">
+        <div class="modal modal-wide">
+            <h2 class="modal-title">📋 История серии</h2>
+            <div class="modal-body" id="historyContent">
+                <p class="text-muted">Серия ещё не начата.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btnHistoryClose">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Series Banned Heroes Modal -->
+    <div class="modal-overlay hidden" id="seriesBannedModal">
+        <div class="modal modal-wide">
+            <h2 class="modal-title">🔒 Заблокированные герои серии</h2>
+            <div class="modal-body" id="seriesBannedContent">
+                <p class="text-muted">Пока нет заблокированных героев.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btnSeriesBannedClose">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Captain Name Modal -->
+    <div class="modal-overlay hidden" id="captainNameModal">
+        <div class="modal modal-sm">
+            <h2 class="modal-title">Введите имя капитана</h2>
+            <div class="modal-body">
+                <input type="text" class="setting-input" id="captainNameInput" placeholder="Ваше имя..." maxlength="20">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btnCaptainNameCancel">Отмена</button>
+                <button class="btn btn-primary" id="btnCaptainNameConfirm">Подтвердить</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Draft Area -->
     <main class="main-content">
+        <!-- Radiant Team Panel -->
         <aside class="team-panel radiant-panel" id="radiantPanel">
-            <!-- ... unchanged ... -->
+            <div class="team-panel-header">
+                <div class="team-banner radiant-banner">
+                    <span class="team-icon-large">🏛️</span>
+                    <h2 class="team-name">Radiant</h2>
+                </div>
+            </div>
+            <div class="phase-section">
+                <span class="phase-label ban-label">🚫 Баны</span>
+                <div class="ban-slots" id="radiantBanSlots">
+                    <div class="ban-slot empty"></div>
+                    <div class="ban-slot empty"></div>
+                    <div class="ban-slot empty"></div>
+                </div>
+            </div>
+            <div class="phase-section">
+                <span class="phase-label pick-label">✅ Пики</span>
+                <div class="team-picks" id="radiantPicks">
+                    <div class="pick-slot empty" data-slot="radiant-0"></div>
+                    <div class="pick-slot empty" data-slot="radiant-1"></div>
+                    <div class="pick-slot empty" data-slot="radiant-2"></div>
+                    <div class="pick-slot empty" data-slot="radiant-3"></div>
+                    <div class="pick-slot empty" data-slot="radiant-4"></div>
+                </div>
+            </div>
             <div class="turn-indicator radiant-turn hidden" id="radiantTurn">
                 <span class="pulse-dot"></span> Ваш ход
             </div>
         </aside>
 
+        <!-- Hero Pool -->
         <section class="hero-pool" id="heroPool">
-            <!-- ... unchanged attribute columns ... -->
+            <div class="attribute-column strength-column">
+                <div class="attribute-header">
+                    <span class="attr-icon">💪</span>
+                    <h3>Сила</h3>
+                    <span class="attr-count" id="strCount">0/9</span>
+                </div>
+                <div class="hero-grid" id="strengthGrid"></div>
+            </div>
+            <div class="attribute-column agility-column">
+                <div class="attribute-header">
+                    <span class="attr-icon">🏃</span>
+                    <h3>Ловкость</h3>
+                    <span class="attr-count" id="agiCount">0/9</span>
+                </div>
+                <div class="hero-grid" id="agilityGrid"></div>
+            </div>
+            <div class="attribute-column intelligence-column">
+                <div class="attribute-header">
+                    <span class="attr-icon">🧠</span>
+                    <h3>Интеллект</h3>
+                    <span class="attr-count" id="intCount">0/9</span>
+                </div>
+                <div class="hero-grid" id="intelligenceGrid"></div>
+            </div>
+            <div class="attribute-column universal-column">
+                <div class="attribute-header">
+                    <span class="attr-icon">✨</span>
+                    <h3>Универсалы</h3>
+                    <span class="attr-count" id="uniCount">0/9</span>
+                </div>
+                <div class="hero-grid" id="universalGrid"></div>
+            </div>
         </section>
 
+        <!-- Dire Team Panel -->
         <aside class="team-panel dire-panel" id="direPanel">
-            <!-- ... unchanged ... -->
-            <div class="turn-indicator dire-turn hidden" id="direTurn">
-                <span class="pulse-dot"></span> Ваш ход
+            <div class="team-panel-header">
+                <div class="team-banner dire-banner">
+                    <span class="team-icon-large">💀</span>
+                    <h2 class="team-name">Dire</h2>
+                </div>
             </div>
-        </aside>
-    </main>
-
-    <!-- Bottom History Panel (renamed) -->
-    <section class="history-section" id="historySection">
-        <div class="history-header">
-            <span class="history-title">📋 Прошлые пики</span>
-        </div>
-        <div class="history-scroll" id="historyScroll">
-            <p class="text-muted">Нет завершённых игр</p>
-        </div>
-    </section>
-
-    <!-- ... footer controls with timer ... -->
-    <script src="game.js?v=4"></script>
-</body>
-</html>
+            <div class="phase-section">
+                <span class="phase-label ban-label">🚫 Баны</span>
+                <div class="ban-slots" id="direBanSlots">
+                    <div class="ban-slot empty"></div>
+                    <div class="ban-slot empty"></div>
+                    <div class="ban-slot empty"></div>
+                </div>
+            </div>
+            <div class="phase-section">
+                <span class="phase-label pick-label">✅ Пики</span>
+                <div class="team-picks" id="direPicks">
+                    <div class
