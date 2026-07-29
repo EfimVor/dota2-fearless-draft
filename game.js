@@ -234,3 +234,4 @@ function renderCaptainBar(){
     var rE=el("radiantCaptainEmpty"),rF=el("radiantCaptainFilled"),rN=el("radiantCaptainName");
     var dE=el("direCaptainEmpty"),dF=el("direCaptainFilled"),dN=el("direCaptainName");
     if(captains.radiant){rE.classList.add("hidden");rF.classList.remove("hidden");rN.textContent=captains
+}
