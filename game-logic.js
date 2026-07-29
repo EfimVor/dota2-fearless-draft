@@ -1,4 +1,4 @@
-/* Dota 2 Fearless Draft - Game Logic (v24 complete) */
+/* Dota 2 Fearless Draft - Game Logic (v25 final) */
 var ALL_HEROES = {
     strength: ["Abaddon","Alchemist","Axe","Bristleback","Centaur Warrunner","Chaos Knight","Dawnbreaker","Doom","Dragon Knight","Earth Spirit","Earthshaker","Elder Titan","Huskar","Kunkka","Legion Commander","Lifestealer","Mars","Night Stalker","Ogre Magi","Omniknight","Primal Beast","Pudge","Sand King","Slardar","Sven","Tidehunter","Timbersaw","Tiny","Treant Protector","Tusk","Underlord","Undying","Wraith King"],
     agility: ["Anti-Mage","Arc Warden","Bloodseeker","Bounty Hunter","Clinkz","Drow Ranger","Ember Spirit","Faceless Void","Gyrocopter","Hoodwink","Juggernaut","Kez","Luna","Medusa","Meepo","Monkey King","Morphling","Muerta","Naga Siren","Nyx Assassin","Phantom Assassin","Phantom Lancer","Razor","Riki","Shadow Fiend","Slark","Sniper","Spectre","Templar Assassin","Terrorblade","Troll Warlord","Ursa","Viper","Weaver"],
@@ -54,12 +54,10 @@ function copyLink(){if(!roomCode)return;var link=location.origin+location.pathna
 function syncCaps(){
     var rE=el("radiantCaptainEmpty"),rF=el("radiantCaptainFilled"),rN=el("radiantCaptainName");
     var dE=el("direCaptainEmpty"),dF=el("direCaptainFilled"),dN=el("direCaptainName");
-    if(svCaptains.radiant){
-        rE.classList.add("hidden");rF.classList.remove("hidden");rN.textContent=svCaptains.radiant;
-    } else { rE.classList.remove("hidden");rF.classList.add("hidden"); }
-    if(svCaptains.dire){
-        dE.classList.add("hidden");dF.classList.remove("hidden");dN.textContent=svCaptains.dire;
-    } else { dE.classList.remove("hidden");dF.classList.add("hidden"); }
+    if(svCaptains.radiant){rE.classList.add("hidden");rF.classList.remove("hidden");rN.textContent=svCaptains.radiant;}
+    else{rE.classList.remove("hidden");rF.classList.add("hidden");}
+    if(svCaptains.dire){dE.classList.add("hidden");dF.classList.remove("hidden");dN.textContent=svCaptains.dire;}
+    else{dE.classList.remove("hidden");dF.classList.add("hidden");}
     updateSpecUI();
 }
 function isMyTurn(){return myTeam!==null&&game.seriesStarted&&game.currentTurn===myTeam&&game.phase!=="complete";}
