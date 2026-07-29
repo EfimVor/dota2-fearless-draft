@@ -1,4 +1,4 @@
-/* Dota 2 Fearless Draft - Game Logic (v11) */
+/* Dota 2 Fearless Draft - Game Logic (v12) */
 var ALL_HEROES = {
     strength: ["Abaddon","Alchemist","Axe","Bristleback","Centaur Warrunner","Chaos Knight","Dawnbreaker","Doom","Dragon Knight","Earth Spirit","Earthshaker","Elder Titan","Huskar","Kunkka","Legion Commander","Lifestealer","Mars","Night Stalker","Ogre Magi","Omniknight","Primal Beast","Pudge","Sand King","Slardar","Sven","Tidehunter","Timbersaw","Tiny","Treant Protector","Tusk","Underlord","Undying","Wraith King"],
     agility: ["Anti-Mage","Arc Warden","Bloodseeker","Bounty Hunter","Clinkz","Drow Ranger","Ember Spirit","Faceless Void","Gyrocopter","Hoodwink","Juggernaut","Kez","Luna","Medusa","Meepo","Monkey King","Morphling","Muerta","Naga Siren","Nyx Assassin","Phantom Assassin","Phantom Lancer","Razor","Riki","Shadow Fiend","Slark","Sniper","Spectre","Templar Assassin","Terrorblade","Troll Warlord","Ursa","Viper","Weaver"],
@@ -144,7 +144,7 @@ function doStart(side){
     else{CFG.banOrder=["radiant","dire","radiant","dire","radiant","dire"];CFG.pickOrder=["radiant","dire","dire","radiant","radiant","dire","dire","radiant","radiant","dire"];}
     game=freshState();game.seriesStarted=true;game.availableHeroes=genPool();game.phase="ban";game.step=0;game.currentTurn=CFG.banOrder[0];
     refresh();broadcast({type:"new_series",startingTeam:side,serializedState:saveState()});syncState();
-    startTimer(game.currentTurn); // ЯВНЫЙ ЗАПУСК ТАЙМЕРА СРАЗУ
+    startTimer(game.currentTurn);
     toast("Новая серия! "+(side==="radiant"?"Radiant":"Dire")+" начинает ⚔️","success");
 }
 function applyNewSeriesLocally(s){if(s)loadState(s);else{game=freshState();game.seriesStarted=true;game.availableHeroes=genPool();game.currentTurn=CFG.banOrder[0];}refresh();}
@@ -198,7 +198,7 @@ function startNextGame(side){
     refresh();
     broadcast({type:"next_game",startingTeam:side});
     syncState();
-    startTimer(game.currentTurn); // ЯВНЫЙ ЗАПУСК ТАЙМЕРА
+    startTimer(game.currentTurn);
     toast("Игра "+game.currentGame+" началась! "+(side==="radiant"?"Radiant":"Dire")+" начинает ⚔️","info");
 }
 function startNextGameRemote(side){startNextGame(side);}
@@ -233,67 +233,4 @@ function renderHistoryPanel(){
 function renderCaptainBar(){
     var rE=el("radiantCaptainEmpty"),rF=el("radiantCaptainFilled"),rN=el("radiantCaptainName");
     var dE=el("direCaptainEmpty"),dF=el("direCaptainFilled"),dN=el("direCaptainName");
-    if(captains.radiant){rE.classList.add("hidden");rF.classList.remove("hidden");rN.textContent=captains.radiant.name;}
-    else{rE.classList.remove("hidden");rF.classList.add("hidden");}
-    if(captains.dire){dE.classList.add("hidden");dF.classList.remove("hidden");dN.textContent=captains.dire.name;}
-    else{dE.classList.remove("hidden");dF.classList.add("hidden");}
-}
-function updateAttrCounts(){var map={strCount:"strength",agiCount:"agility",intCount:"intelligence",uniCount:"universal"};for(var id in map){if(!map.hasOwnProperty(id))continue;var attr=map[id];var heroes=game.availableHeroes[attr]||[];var sel=heroes.filter(function(h){return!game.currentGameBans.some(function(b){return b.hero===h;})&&!game.currentGamePicks.some(function(p){return p.hero===h;});}).length;var e=el(id);if(e)e.textContent=sel+"/"+CFG.heroesPerAttribute;}}
-function updateGameBadge(){el("gameBadge").textContent="Игра "+game.currentGame;}
-function updatePhaseBadge(){var b=el("phaseBadge");if(!game.seriesStarted){b.textContent="Ожидание";b.className="phase-badge waiting";return;}if(game.phase==="ban"){b.textContent="Фаза банов";b.className="phase-badge ban-phase";}else if(game.phase==="pick"){b.textContent="Фаза пиков";b.className="phase-badge pick-phase";}else{b.textContent="Завершено";b.className="phase-badge complete";}}
-function updateScoreDisplay(){el("radiantScore").textContent=game.radiantScore;el("direScore").textContent=game.direScore;}
-function updateUI(){updateTurnDisplay();updateButtons();updateGameBadge();updatePhaseBadge();updateScoreDisplay();updateTimerDisplay();}
-function updateTurnDisplay(){var rT=el("radiantTurn"),dT=el("direTurn"),tI=el("turnInfo");if(!game.seriesStarted){if(rT)rT.classList.add("hidden");if(dT)dT.classList.add("hidden");if(tI){tI.textContent="Подключитесь к комнате для начала";tI.className="turn-info";}resetGlows();return;}if(game.phase==="complete"){if(rT)rT.classList.add("hidden");if(dT)dT.classList.add("hidden");if(tI){tI.textContent="Драфт завершён";tI.className="turn-info";}resetGlows();return;}var isR=game.currentTurn==="radiant";if(rT)rT.classList.toggle("hidden",!isR);if(dT)dT.classList.toggle("hidden",isR);var rP=el("radiantPanel"),dP=el("direPanel");if(rP&&dP){rP.style.boxShadow=isR?"0 0 25px var(--radiant-glow)":"none";dP.style.boxShadow=!isR?"0 0 25px var(--dire-glow)":"none";}startTimer(game.currentTurn);}
-function resetGlows(){var r=el("radiantPanel"),d=el("direPanel");if(r)r.style.boxShadow="none";if(d)d.style.boxShadow="none";}
-function updateButtons(){var u=el("btnUndo"),n=el("btnNextGame");var has=(game.phase==="ban"&&game.currentGameBans.length>0)||(game.phase==="pick"&&(game.currentGamePicks.length>0||game.currentGameBans.length>0));if(u)u.disabled=!game.seriesStarted||!has||game.phase==="complete"||!isLocal();if(n)n.disabled=!game.seriesStarted||game.phase!=="complete"||!isLocal();}
-
-// Modals
-function showSettings(){el("settingHeroesPerAttr").value=CFG.heroesPerAttribute;el("settingBansPerTeam").value=CFG.bansPerTeam;el("settingPicksPerTeam").value=CFG.picksPerTeam;el("settingBanOrder").value=CFG.banOrder.join(",");el("settingPickOrder").value=CFG.pickOrder.join(",");el("settingsModal").classList.remove("hidden");}
-function hideSettings(){el("settingsModal").classList.add("hidden");}
-function applySettings(){var hpa=Math.max(5,Math.min(15,parseInt(el("settingHeroesPerAttr").value)||10));var bpt=Math.max(1,Math.min(5,parseInt(el("settingBansPerTeam").value)||3));var ppt=Math.max(3,Math.min(5,parseInt(el("settingPicksPerTeam").value)||5));var br=(el("settingBanOrder").value||"R,D,R,D,R,D").split(",").map(function(s){var t=s.trim().toLowerCase();if(t==="r"||t==="radiant")return"radiant";if(t==="d"||t==="dire")return"dire";return null;}).filter(Boolean);var pr=(el("settingPickOrder").value||"R,D,D,R,R,D,D,R,R,D").split(",").map(function(s){var t=s.trim().toLowerCase();if(t==="r"||t==="radiant")return"radiant";if(t==="d"||t==="dire")return"dire";return null;}).filter(Boolean);if(br.length!==bpt*2){toast("Баны: ровно "+(bpt*2)+" элементов!","error");return;}if(pr.length!==ppt*2){toast("Пики: ровно "+(ppt*2)+" элементов!","error");return;}CFG.heroesPerAttribute=hpa;CFG.bansPerTeam=bpt;CFG.picksPerTeam=ppt;CFG.banOrder=br;CFG.pickOrder=pr;hideSettings();if(game.seriesStarted)startNewSeries();toast("Настройки применены!","success");}
-function showHistory(){var c=el("historyContent");if(!c)return;if(game.seriesHistory.length===0&&game.currentGameBans.length===0&&game.currentGamePicks.length===0){c.innerHTML='<p class="text-muted">Серия ещё не начата.</p>';}else{var h='<div style="display:flex;flex-direction:column;gap:14px;">';for(var i=0;i<game.seriesHistory.length;i++){var g=game.seriesHistory[i];h+='<div style="border:1px solid var(--border-color);border-radius:8px;padding:12px;"><h4 style="margin-bottom:8px;">Игра '+g.gameNumber+'</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div><strong style="color:var(--radiant-color);">🏛️ Radiant</strong><div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> '+(g.bans&&g.bans.radiant?g.bans.radiant.join(", "):"—")+'</div><div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> '+(g.picks&&g.picks.radiant?g.picks.radiant.join(", "):"—")+'</div></div><div><strong style="color:var(--dire-color);">💀 Dire</strong><div style="font-size:0.7rem;margin-top:4px;"><span class="phase-tag ban">БАН</span> '+(g.bans&&g.bans.dire?g.bans.dire.join(", "):"—")+'</div><div style="font-size:0.75rem;margin-top:2px;"><span class="phase-tag pick">ПИК</span> '+(g.picks&&g.picks.dire?g.picks.dire.join(", "):"—")+'</div></div></div></div>';}c.innerHTML=h;}el("historyModal").classList.remove("hidden");}
-function hideHistory(){el("historyModal").classList.add("hidden");}
-function showSeriesBanned(){var c=el("seriesBannedContent");if(!c)return;if(game.seriesBannedHeroes.length===0){c.innerHTML='<p class="text-muted">Пока нет заблокированных героев.</p>';}else{var h='<div class="series-banned-grid">';var sorted=game.seriesBannedHeroes.slice().sort();for(var i=0;i<sorted.length;i++){var hero=sorted[i];var img=heroImg(hero);var found=null;for(var j=0;j<game.seriesHistory.length;j++){if((game.seriesHistory[j].picks&&game.seriesHistory[j].picks.radiant&&game.seriesHistory[j].picks.radiant.indexOf(hero)!==-1)||(game.seriesHistory[j].picks&&game.seriesHistory[j].picks.dire&&game.seriesHistory[j].picks.dire.indexOf(hero)!==-1)){found=game.seriesHistory[j];break;}}var gn=found?found.gameNumber:"?";h+='<div class="series-banned-hero"><div class="sb-avatar" style="background-image:url('+img+')"></div><div class="sb-info"><span class="sb-name">'+hero+'</span><span class="sb-game">Игра '+gn+'</span></div></div>';}h+='</div>';c.innerHTML=h;}el("seriesBannedModal").classList.remove("hidden");}
-function hideSeriesBanned(){el("seriesBannedModal").classList.add("hidden");}
-function toast(msg,type){type=type||"info";var c=el("toastContainer");if(!c)return;var t=document.createElement("div");t.className="toast "+type;t.textContent=msg;c.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},2500);}
-function createParticles(){var c=el("bgParticles");if(!c)return;for(var i=0;i<20;i++){var p=document.createElement("div");p.className="particle";p.style.left=Math.random()*100+"%";p.style.animationDelay=Math.random()*6+"s";p.style.animationDuration=(5+Math.random()*8)+"s";p.style.width=(1+Math.random()*2)+"px";p.style.height=p.style.width;c.appendChild(p);}}
-
-// Init
-document.addEventListener("DOMContentLoaded",function(){
-    createParticles();connect();
-    el("btnCreateRoom").addEventListener("click",createRoom);
-    el("btnJoinRoom").addEventListener("click",function(){joinRoom();});
-    el("btnCopyLink").addEventListener("click",copyLink);
-    el("joinRoomInput").addEventListener("keydown",function(e){if(e.key==="Enter")joinRoom();});
-    el("btnClaimRadiant").addEventListener("click",function(){claimCaptain("radiant");});
-    el("btnClaimDire").addEventListener("click",function(){claimCaptain("dire");});
-    el("btnLeaveRadiant").addEventListener("click",function(){leaveCaptain("radiant");});
-    el("btnLeaveDire").addEventListener("click",function(){leaveCaptain("dire");});
-    el("btnCaptainNameConfirm").addEventListener("click",confirmCapName);
-    el("btnCaptainNameCancel").addEventListener("click",function(){el("captainNameModal").classList.add("hidden");pendingCap=null;});
-    el("captainNameInput").addEventListener("keydown",function(e){if(e.key==="Enter")confirmCapName();});
-    el("btnNewSeries").addEventListener("click",startNewSeries);
-    el("btnNextGame").addEventListener("click",nextGame);
-    el("btnUndo").addEventListener("click",undoLastAction);
-    el("btnStartRadiant").addEventListener("click",function(){
-        el("startSideModal").classList.add("hidden");
-        if(pendingNextGame){pendingNextGame=false;startNextGame("radiant");}
-        else{doStart("radiant");}
-    });
-    el("btnStartDire").addEventListener("click",function(){
-        el("startSideModal").classList.add("hidden");
-        if(pendingNextGame){pendingNextGame=false;startNextGame("dire");}
-        else{doStart("dire");}
-    });
-    el("btnStartSideCancel").addEventListener("click",function(){el("startSideModal").classList.add("hidden");pendingNextGame=false;});
-    el("btnSettings").addEventListener("click",showSettings);
-    el("btnSettingsClose").addEventListener("click",hideSettings);
-    el("btnSettingsApply").addEventListener("click",applySettings);
-    el("btnHistory").addEventListener("click",showHistory);
-    el("btnHistoryClose").addEventListener("click",hideHistory);
-    el("btnSeriesBanned").addEventListener("click",showSeriesBanned);
-    el("btnSeriesBannedClose").addEventListener("click",hideSeriesBanned);
-    var ovs=document.querySelectorAll(".modal-overlay");for(var i=0;i<ovs.length;i++){ovs[i].addEventListener("click",function(e){if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden");});}
-    document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.key==="z"){e.preventDefault();undoLastAction();}if(e.ctrlKey&&e.key==="n"){e.preventDefault();var btn=el("btnNextGame");if(btn&&!btn.disabled)nextGame();}if(e.key==="Escape"){hideSettings();hideHistory();hideSeriesBanned();}});
-    refresh();updateUI();el("connInfo").style.display="none";
-});
+    if(captains.radiant){rE.classList.add("hidden");rF.classList.remove("hidden");rN.textContent=captains
