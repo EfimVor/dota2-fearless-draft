@@ -1,4 +1,4 @@
-/* Dota 2 Fearless Draft - Game Logic (v10) */
+/* Dota 2 Fearless Draft - Game Logic (v11) */
 var ALL_HEROES = {
     strength: ["Abaddon","Alchemist","Axe","Bristleback","Centaur Warrunner","Chaos Knight","Dawnbreaker","Doom","Dragon Knight","Earth Spirit","Earthshaker","Elder Titan","Huskar","Kunkka","Legion Commander","Lifestealer","Mars","Night Stalker","Ogre Magi","Omniknight","Primal Beast","Pudge","Sand King","Slardar","Sven","Tidehunter","Timbersaw","Tiny","Treant Protector","Tusk","Underlord","Undying","Wraith King"],
     agility: ["Anti-Mage","Arc Warden","Bloodseeker","Bounty Hunter","Clinkz","Drow Ranger","Ember Spirit","Faceless Void","Gyrocopter","Hoodwink","Juggernaut","Kez","Luna","Medusa","Meepo","Monkey King","Morphling","Muerta","Naga Siren","Nyx Assassin","Phantom Assassin","Phantom Lancer","Razor","Riki","Shadow Fiend","Slark","Sniper","Spectre","Templar Assassin","Terrorblade","Troll Warlord","Ursa","Viper","Weaver"],
@@ -89,6 +89,7 @@ var timerInt=null;
 function startTimer(team){
     stopTimer();updateTimerDisplay();
     if(!game.seriesStarted||game.phase==="complete")return;
+    if(!team)return;
     if(game.currentTurn!==team||(captains[team]&&captains[team].id!=="local"))return;
     timerInt=setInterval(function(){
         if(game.phase==="complete"){stopTimer();return;}
@@ -143,6 +144,7 @@ function doStart(side){
     else{CFG.banOrder=["radiant","dire","radiant","dire","radiant","dire"];CFG.pickOrder=["radiant","dire","dire","radiant","radiant","dire","dire","radiant","radiant","dire"];}
     game=freshState();game.seriesStarted=true;game.availableHeroes=genPool();game.phase="ban";game.step=0;game.currentTurn=CFG.banOrder[0];
     refresh();broadcast({type:"new_series",startingTeam:side,serializedState:saveState()});syncState();
+    startTimer(game.currentTurn); // ЯВНЫЙ ЗАПУСК ТАЙМЕРА СРАЗУ
     toast("Новая серия! "+(side==="radiant"?"Radiant":"Dire")+" начинает ⚔️","success");
 }
 function applyNewSeriesLocally(s){if(s)loadState(s);else{game=freshState();game.seriesStarted=true;game.availableHeroes=genPool();game.currentTurn=CFG.banOrder[0];}refresh();}
@@ -196,6 +198,7 @@ function startNextGame(side){
     refresh();
     broadcast({type:"next_game",startingTeam:side});
     syncState();
+    startTimer(game.currentTurn); // ЯВНЫЙ ЗАПУСК ТАЙМЕРА
     toast("Игра "+game.currentGame+" началась! "+(side==="radiant"?"Radiant":"Dire")+" начинает ⚔️","info");
 }
 function startNextGameRemote(side){startNextGame(side);}
