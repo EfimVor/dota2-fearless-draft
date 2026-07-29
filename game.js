@@ -1,4 +1,4 @@
-/* Dota 2 Fearless Draft - Game Logic (v9) */
+/* Dota 2 Fearless Draft - Game Logic (v10) */
 var ALL_HEROES = {
     strength: ["Abaddon","Alchemist","Axe","Bristleback","Centaur Warrunner","Chaos Knight","Dawnbreaker","Doom","Dragon Knight","Earth Spirit","Earthshaker","Elder Titan","Huskar","Kunkka","Legion Commander","Lifestealer","Mars","Night Stalker","Ogre Magi","Omniknight","Primal Beast","Pudge","Sand King","Slardar","Sven","Tidehunter","Timbersaw","Tiny","Treant Protector","Tusk","Underlord","Undying","Wraith King"],
     agility: ["Anti-Mage","Arc Warden","Bloodseeker","Bounty Hunter","Clinkz","Drow Ranger","Ember Spirit","Faceless Void","Gyrocopter","Hoodwink","Juggernaut","Kez","Luna","Medusa","Meepo","Monkey King","Morphling","Muerta","Naga Siren","Nyx Assassin","Phantom Assassin","Phantom Lancer","Razor","Riki","Shadow Fiend","Slark","Sniper","Spectre","Templar Assassin","Terrorblade","Troll Warlord","Ursa","Viper","Weaver"],
@@ -290,4 +290,7 @@ document.addEventListener("DOMContentLoaded",function(){
     el("btnHistoryClose").addEventListener("click",hideHistory);
     el("btnSeriesBanned").addEventListener("click",showSeriesBanned);
     el("btnSeriesBannedClose").addEventListener("click",hideSeriesBanned);
-    var ovs=document.querySelectorAll(".modal-overlay");for(var i=0;i<ovs.length;i++){ovs[i].addEventListener("click",function(e){if(e.target===e.currentTarget)e
+    var ovs=document.querySelectorAll(".modal-overlay");for(var i=0;i<ovs.length;i++){ovs[i].addEventListener("click",function(e){if(e.target===e.currentTarget)e.currentTarget.classList.add("hidden");});}
+    document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.key==="z"){e.preventDefault();undoLastAction();}if(e.ctrlKey&&e.key==="n"){e.preventDefault();var btn=el("btnNextGame");if(btn&&!btn.disabled)nextGame();}if(e.key==="Escape"){hideSettings();hideHistory();hideSeriesBanned();}});
+    refresh();updateUI();el("connInfo").style.display="none";
+});
