@@ -70,10 +70,7 @@ function updateSpecUI(){
         if(captains.radiant&&captains.dire){
             if(cr)cr.style.display="none";
             if(cd)cd.style.display="none";
-            toast("Вы зритель 👁️","info");
-        } else {
-            if(cr)cr.style.display="";
-            if(cd)cd.style.display="";
+            toast("Вы зритель","info");
         }
     } else {
         if(cr)cr.style.display="";
@@ -271,4 +268,26 @@ document.addEventListener("DOMContentLoaded",function(){
     el("btnLeaveDire").addEventListener("click",function(){leaveCaptain("dire");});
     el("btnCaptainNameConfirm").addEventListener("click",confirmCapName);
     el("btnCaptainNameCancel").addEventListener("click",function(){el("captainNameModal").classList.add("hidden");pendingCap=null;});
-    el("captainNameInput").addEventListener("keydown",function(e){if(e.key==="Enter")confirmCap
+    el("captainNameInput").addEventListener("keydown",function(e){if(e.key==="Enter")confirmCapName();});
+    el("btnNewSeries").addEventListener("click",startNewSeries);
+    el("btnNextGame").addEventListener("click",nextGame);
+    el("btnUndo").addEventListener("click",undoLastAction);
+    el("btnStartRadiant").addEventListener("click",function(){
+        el("startSideModal").classList.add("hidden");
+        if(pendingNextGame){pendingNextGame=false;startNextGame("radiant");}
+        else{doStart("radiant");}
+    });
+    el("btnStartDire").addEventListener("click",function(){
+        el("startSideModal").classList.add("hidden");
+        if(pendingNextGame){pendingNextGame=false;startNextGame("dire");}
+        else{doStart("dire");}
+    });
+    el("btnStartSideCancel").addEventListener("click",function(){el("startSideModal").classList.add("hidden");pendingNextGame=false;});
+    el("btnSettings").addEventListener("click",showSettings);
+    el("btnSettingsClose").addEventListener("click",hideSettings);
+    el("btnSettingsApply").addEventListener("click",applySettings);
+    el("btnHistory").addEventListener("click",showHistory);
+    el("btnHistoryClose").addEventListener("click",hideHistory);
+    el("btnSeriesBanned").addEventListener("click",showSeriesBanned);
+    el("btnSeriesBannedClose").addEventListener("click",hideSeriesBanned);
+    var ovs=document.querySelectorAll(".modal-overlay");for(var i=0;i<ovs.length;i++){ovs[i].addEventListener("click",function(e){if(e.target===e.currentTarget)e
