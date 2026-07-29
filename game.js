@@ -1,4 +1,4 @@
-/* Dota 2 Fearless Draft - Game Logic (v15) */
+/* Dota 2 Fearless Draft - Game Logic (v16) */
 var ALL_HEROES = {
     strength: ["Abaddon","Alchemist","Axe","Bristleback","Centaur Warrunner","Chaos Knight","Dawnbreaker","Doom","Dragon Knight","Earth Spirit","Earthshaker","Elder Titan","Huskar","Kunkka","Legion Commander","Lifestealer","Mars","Night Stalker","Ogre Magi","Omniknight","Primal Beast","Pudge","Sand King","Slardar","Sven","Tidehunter","Timbersaw","Tiny","Treant Protector","Tusk","Underlord","Undying","Wraith King"],
     agility: ["Anti-Mage","Arc Warden","Bloodseeker","Bounty Hunter","Clinkz","Drow Ranger","Ember Spirit","Faceless Void","Gyrocopter","Hoodwink","Juggernaut","Kez","Luna","Medusa","Meepo","Monkey King","Morphling","Muerta","Naga Siren","Nyx Assassin","Phantom Assassin","Phantom Lancer","Razor","Riki","Shadow Fiend","Slark","Sniper","Spectre","Templar Assassin","Terrorblade","Troll Warlord","Ursa","Viper","Weaver"],
@@ -106,8 +106,8 @@ function forceRandom(team){
 }
 function updateTimerDisplay(){
     var mainEl=el("timerMain"),resEl=el("timerReserve"),cont=el("timerContainer"),info=el("turnInfo");
-    if(!game.seriesStarted||game.phase==="complete"){if(cont)cont.style.display="none";if(info)info.style.display="block";return;}
-    if(cont)cont.style.display="flex";if(info)info.style.display="none";
+    if(!game.seriesStarted||game.phase==="complete"){if(cont)cont.style.display="none";return;}
+    if(cont)cont.style.display="flex";
     var team=game.currentTurn,reserve=game.reserveTimers[team]||0;
     var mm=Math.floor(Math.max(0,game.mainTimer)/60),ms=Math.max(0,game.mainTimer)%60;
     if(mainEl)mainEl.textContent=(mm<10?"0":"")+mm+":"+(ms<10?"0":"")+ms;
@@ -194,7 +194,7 @@ function startNextGame(side){
 }
 function startNextGameRemote(side){startNextGame(side);}
 
-function refresh(){renderHeroPool();renderTeamBans("radiant");renderTeamBans("dire");renderTeamPicks("radiant");renderTeamPicks("dire");renderHistoryPanel();updateAttrCounts();updateGameBadge();updatePhaseBadge();updateScoreDisplay();renderCaptainBar();updateButtons();updateTimerDisplay();updateSpecUI();}
+function refresh(){renderHeroPool();renderTeamBans("radiant");renderTeamBans("dire");renderTeamPicks("radiant");renderTeamPicks("dire");renderHistoryPanel();updateAttrCounts();updateGameBadge();updatePhaseBadge();updateScoreDisplay();renderCaptainBar();updateButtons();updateTimerDisplay();updateTurnDisplay();updateSpecUI();}
 function renderHeroPool(){var grids={strength:"strengthGrid",agility:"agilityGrid",intelligence:"intelligenceGrid",universal:"universalGrid"};for(var attr in grids){if(!grids.hasOwnProperty(attr))continue;var grid=el(grids[attr]);if(!grid)continue;var heroes=game.availableHeroes[attr]||[];grid.innerHTML="";if(!game.seriesStarted){grid.innerHTML='<div class="text-muted" style="grid-column:1/-1;padding:12px;font-size:0.65rem;">Начните серию</div>';continue;}if(heroes.length===0){grid.innerHTML='<div class="text-muted" style="grid-column:1/-1;padding:12px;font-size:0.65rem;">Нет героев</div>';continue;}for(var i=0;i<heroes.length;i++){(function(hero,attr){var card=document.createElement("div");var banned=game.currentGameBans.some(function(b){return b.hero===hero;});var picked=game.currentGamePicks.some(function(p){return p.hero===hero;});var seriesBanned=game.seriesBannedHeroes.indexOf(hero)!==-1;var cls="hero-card "+attr;if(seriesBanned)cls+=" series-banned";else if(picked)cls+=" picked";else if(banned)cls+=" banned";card.className=cls;var img=heroImg(hero);if(img)card.style.backgroundImage="url("+img+")";else card.style.backgroundColor=attrBg(attr);var inner='<div class="hero-info"><span class="hero-name">'+hero+'</span><span class="hero-attr-badge">'+attrLabel(attr)+'</span></div>';if(banned&&!seriesBanned&&!picked)inner+='<span class="banned-overlay">🚫</span>';card.innerHTML=inner;if(!seriesBanned&&!picked&&!banned){if(game.phase==="ban")card.onclick=function(){banHero(hero,attr);};else if(game.phase==="pick")card.onclick=function(){pickHero(hero,attr);};}grid.appendChild(card);})(heroes[i],attr);}var needed=CFG.heroesPerAttribute-heroes.length;for(var j=0;j<needed;j++){var e=document.createElement("div");e.className="hero-card series-banned";e.innerHTML='<div class="hero-info"><span class="hero-name" style="color:#333;">Заблокирован</span></div>';grid.appendChild(e);}}}
 function renderTeamBans(team){var c=el(team+"BanSlots");if(!c)return;var bans=game.bans[team]||[];c.innerHTML="";for(var i=0;i<CFG.bansPerTeam;i++){var s=document.createElement("div");s.className="ban-slot";if(i<bans.length){s.className+=" filled";var img=heroImg(bans[i]);if(img){s.style.backgroundImage="url("+img+")";s.style.backgroundSize="cover";s.style.backgroundPosition="center 20%";}else s.style.background=attrBg("strength");s.title=bans[i];}else s.className+=" empty";c.appendChild(s);}}
 function renderTeamPicks(team){var c=el(team+"Picks");if(!c)return;var picks=game.picks[team]||[];c.innerHTML="";for(var i=0;i<CFG.picksPerTeam;i++){var s=document.createElement("div");s.className="pick-slot";if(i<picks.length){s.className+=" filled "+team+"-pick";var img=heroImg(picks[i]);if(img)s.style.backgroundImage="url("+img+")";s.innerHTML="<span>"+picks[i]+"</span>";s.title=picks[i];}else{s.className+=" empty";s.textContent="ПУСТО";}s.dataset.slot=team+"-"+i;c.appendChild(s);}}
@@ -234,12 +234,15 @@ function updatePhaseBadge(){var b=el("phaseBadge");if(!game.seriesStarted){b.tex
 function updateScoreDisplay(){el("radiantScore").textContent=game.radiantScore;el("direScore").textContent=game.direScore;}
 function updateUI(){updateTurnDisplay();updateButtons();updateGameBadge();updatePhaseBadge();updateScoreDisplay();updateTimerDisplay();}
 function updateTurnDisplay(){
-    var rT=el("radiantTurn"),dT=el("direTurn"),tI=el("turnInfo");
-    if(!game.seriesStarted){if(rT)rT.classList.add("hidden");if(dT)dT.classList.add("hidden");if(tI){tI.textContent="Подключитесь к комнате для начала";tI.className="turn-info";}resetGlows();return;}
-    if(game.phase==="complete"){if(rT)rT.classList.add("hidden");if(dT)dT.classList.add("hidden");if(tI){tI.textContent="Драфт завершён";tI.className="turn-info";}resetGlows();return;}
+    var rN=el("radiantNotice"),dN=el("direNotice"),tI=el("turnInfo");
+    if(!game.seriesStarted||game.phase==="complete"){
+        if(rN)rN.classList.add("hidden");if(dN)dN.classList.add("hidden");
+        if(tI){tI.textContent="Подключитесь к комнате для начала";tI.className="turn-info";}
+        resetGlows();return;
+    }
     var isR=game.currentTurn==="radiant";
-    if(rT)rT.classList.toggle("hidden",!isR);
-    if(dT)dT.classList.toggle("hidden",isR);
+    if(rN)rN.classList.toggle("hidden",!isR);
+    if(dN)dN.classList.toggle("hidden",isR);
     if(tI){tI.textContent=isR?"⚔️ Ход Radiant":"⚔️ Ход Dire";tI.className="turn-info "+(isR?"radiant-turn-text":"dire-turn-text");}
     var rP=el("radiantPanel"),dP=el("direPanel");
     if(rP&&dP){rP.style.boxShadow=isR?"0 0 25px var(--radiant-glow)":"none";dP.style.boxShadow=!isR?"0 0 25px var(--dire-glow)":"none";}

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dota 2 — Fearless Draft</title>
-    <link rel="stylesheet" href="style.css?v=20">
+    <link rel="stylesheet" href="style.css?v=21">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🗡️</text></svg>">
 </head>
 <body>
@@ -211,6 +211,7 @@
                     <h2 class="team-name">Radiant</h2>
                 </div>
             </div>
+            <div class="turn-notice radiant-notice hidden" id="radiantNotice">⚔️ ВАШ ХОД</div>
             <div class="phase-section">
                 <span class="phase-label ban-label">🚫 Баны</span>
                 <div class="ban-slots" id="radiantBanSlots">
@@ -278,6 +279,7 @@
                     <h2 class="team-name">Dire</h2>
                 </div>
             </div>
+            <div class="turn-notice dire-notice hidden" id="direNotice">⚔️ ВАШ ХОД</div>
             <div class="phase-section">
                 <span class="phase-label ban-label">🚫 Баны</span>
                 <div class="ban-slots" id="direBanSlots">
@@ -331,6 +333,6 @@
     <!-- Hidden copy helper -->
     <input type="text" id="copyHelper" style="position:absolute;left:-9999px;" aria-hidden="true">
 
-    <script src="game.js?v=12"></script>
+    <script src="game.js?v=13"></script>
 </body>
 </html>
