@@ -289,4 +289,48 @@
             <div class="phase-section">
                 <span class="phase-label pick-label">✅ Пики</span>
                 <div class="team-picks" id="direPicks">
-                    <div class
+                    <div class="pick-slot empty" data-slot="dire-0"></div>
+                    <div class="pick-slot empty" data-slot="dire-1"></div>
+                    <div class="pick-slot empty" data-slot="dire-2"></div>
+                    <div class="pick-slot empty" data-slot="dire-3"></div>
+                    <div class="pick-slot empty" data-slot="dire-4"></div>
+                </div>
+            </div>
+            <div class="turn-indicator dire-turn hidden" id="direTurn">
+                <span class="pulse-dot"></span> Ваш ход
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom History Panel (Draft picks summary) -->
+    <section class="history-section" id="historySection">
+        <div class="history-header">
+            <span class="history-title">📋 Прошлые пики</span>
+        </div>
+        <div class="history-scroll" id="historyScroll">
+            <p class="text-muted">Нет завершённых игр</p>
+        </div>
+    </section>
+
+    <!-- Bottom Controls with Timer -->
+    <footer class="footer-controls">
+        <button class="btn btn-glass" id="btnUndo" disabled>↩ Отменить</button>
+        <div class="footer-center">
+            <div class="timer-container" id="timerContainer" style="display: none;">
+                <div class="timer-main" id="timerMain">00:30</div>
+                <div class="timer-reserve" id="timerReserve">+2:10</div>
+            </div>
+            <span class="turn-info" id="turnInfo">Подключитесь к комнате для начала</span>
+        </div>
+        <button class="btn btn-primary btn-next" id="btnNextGame" disabled>Следующая игра ▶</button>
+    </footer>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Hidden copy helper -->
+    <input type="text" id="copyHelper" style="position:absolute;left:-9999px;" aria-hidden="true">
+
+    <script src="game.js?v=7"></script>
+</body>
+</html>

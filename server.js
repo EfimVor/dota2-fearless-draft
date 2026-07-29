@@ -216,7 +216,6 @@ wss.on('connection', (ws, req) => {
 
             case 'TIMER_SYNC': {
                 if (!currentRoom) return;
-                // Пересылаем данные таймера всем, кроме отправителя
                 broadcastToRoom(currentRoom, {
                     type: 'TIMER_TICK',
                     timerData: msg.timerData

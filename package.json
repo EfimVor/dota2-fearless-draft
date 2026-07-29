@@ -1,6 +1,6 @@
 {
   "name": "dota2-fearless-draft",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Dota 2 Fearless Draft",
   "main": "server.js",
   "scripts": {
