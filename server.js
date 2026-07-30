@@ -185,7 +185,10 @@ wss.on('connection', (ws, req) => {
             }
 
             case 'CLAIM_CAPTAIN': {
-                if (!currentRoom) { ws.send(JSON.stringify({ type: 'ERROR', message: 'Вы не в комнате' })); return; }
+                if (!currentRoom) {
+                    ws.send(JSON.stringify({ type: 'ERROR', message: 'Вы не в комнате' }));
+                    return;
+                }
                 const { team, name } = msg;
                 if (currentRoom.captains[team]) {
                     ws.send(JSON.stringify({ type: 'ERROR', message: `Капитан ${team} уже выбран` }));
@@ -207,4 +210,58 @@ wss.on('connection', (ws, req) => {
             case 'SYNC_STATE': {
                 if (!currentRoom) return;
                 currentRoom.state = msg.state;
-                const stateMsg = { type: 'STATE_SYNC', state: msg.state
+                const stateMsg = { type: 'STATE_SYNC', state: msg.state, captains: currentRoom.captains };
+                broadcastToRoom(currentRoom, stateMsg, ws);
+                break;
+            }
+
+            case 'GAME_ACTION': {
+                if (!currentRoom) return;
+                if (msg.action && msg.action.type === 'new_series' && msg.action.serializedState) {
+                    currentRoom.state = msg.action.serializedState;
+                }
+                broadcastToRoom(currentRoom, { type: 'GAME_ACTION', action: msg.action, captains: currentRoom.captains }, ws);
+                break;
+            }
+
+            case 'TIMER_SYNC': {
+                if (!currentRoom) return;
+                broadcastToRoom(currentRoom, {
+                    type: 'TIMER_TICK',
+                    timerData: msg.timerData
+                }, ws);
+                break;
+            }
+
+            default:
+                ws.send(JSON.stringify({ type: 'ERROR', message: 'Неизвестный тип сообщения' }));
+        }
+    });
+
+    ws.on('close', () => {
+        if (currentRoom) {
+            currentRoom.players.delete(ws);
+            broadcastToRoom(currentRoom, { type: 'PLAYER_LEFT', playerCount: currentRoom.players.size }, ws);
+        }
+    });
+
+    ws.on('error', (err) => console.error('WebSocket ошибка:', err.message));
+});
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [code, room] of rooms) {
+        let hasActive = false;
+        for (const ws of room.players) {
+            if (ws.readyState === 1) { hasActive = true; break; }
+        }
+        if (!hasActive && now - room.createdAt > 30 * 60 * 1000) {
+            rooms.delete(code);
+            console.log(`Комната ${code} удалена (неактивна 30 мин)`);
+        }
+    }
+}, 10 * 60 * 1000);
+
+server.listen(PORT, HOST, () => {
+    console.log(`\n⚔️  Dota 2 Fearless Draft Server запущен на http://${HOST}:${PORT}\n`);
+});
