@@ -48,11 +48,7 @@ function serveStaticFile(res, filePath) {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
     fs.readFile(filePath, (err, data) => {
-        if (err) {
-            res.writeHead(404, { 'Content-Type': 'text/plain' });
-            res.end('404 Not Found');
-            return;
-        }
+        if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('404 Not Found'); return; }
         res.writeHead(200, { 'Content-Type': contentType });
         res.end(data);
     });
@@ -152,7 +148,6 @@ wss.on('connection', (ws, req) => {
                 ws.captainTeam = null;
                 ws.captainName = null;
                 ws.send(JSON.stringify({ type: 'ROOM_LEFT' }));
-                console.log(`Игрок вышел из комнаты ${oldRoom.code}`);
                 break;
             }
             case 'CLAIM_CAPTAIN': {
@@ -185,6 +180,18 @@ wss.on('connection', (ws, req) => {
                     currentRoom.state = msg.action.serializedState;
                 }
                 broadcastToRoom(currentRoom, { type: 'GAME_ACTION', action: msg.action, captains: currentRoom.captains }, ws);
+                break;
+            }
+            case 'CHAT_MESSAGE': {
+                if (!currentRoom) return;
+                const chatMsg = {
+                    type: 'CHAT_MESSAGE',
+                    text: String(msg.text || '').slice(0, 200),
+                    from: ws.captainName || 'Наблюдатель',
+                    team: ws.captainTeam || null,
+                    ts: Date.now()
+                };
+                broadcastToRoom(currentRoom, chatMsg);
                 break;
             }
             case 'TIMER_SYNC': {

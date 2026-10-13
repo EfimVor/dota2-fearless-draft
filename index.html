@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dota 2 — Fearless Draft</title>
-    <link rel="stylesheet" href="style.css?v=31">
+    <link rel="stylesheet" href="style.css?v=32">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🗡️</text></svg>">
 </head>
 <body>
@@ -12,9 +12,6 @@
         <div class="bg-glow bg-glow-radiant"></div>
         <div class="bg-glow bg-glow-dire"></div>
         <div class="bg-particles" id="bgParticles"></div>
-        <div class="bg-rune bg-rune-1">◈</div>
-        <div class="bg-rune bg-rune-2">◆</div>
-        <div class="bg-rune bg-rune-3">◇</div>
     </div>
     <div class="connection-bar" id="connectionBar">
         <div class="conn-status" id="connStatus">
@@ -46,6 +43,21 @@
             </div>
             <span class="game-badge" id="gameBadge">Игра 1</span>
             <span class="phase-badge" id="phaseBadge">Ожидание</span>
+        </div>
+        <div class="header-center">
+            <div class="series-score" id="seriesScore" style="display:none;">
+                <div class="score-team radiant-score-bg">
+                    <span class="score-icon">🏛️</span>
+                    <span class="score-name">Radiant</span>
+                    <span class="score-value" id="radiantScore">0</span>
+                </div>
+                <div class="score-vs">:</div>
+                <div class="score-team dire-score-bg">
+                    <span class="score-value" id="direScore">0</span>
+                    <span class="score-name">Dire</span>
+                    <span class="score-icon">💀</span>
+                </div>
+            </div>
         </div>
         <div class="header-right">
             <button class="btn btn-glass" id="btnSettings" title="Настройки">⚙️</button>
@@ -92,7 +104,7 @@
                 <div class="setting-group"><label class="setting-label">Героев на атрибут</label><input type="number" class="setting-input" id="settingHeroesPerAttr" value="9" min="5" max="15"></div>
                 <div class="setting-group"><label class="setting-label">Банов на команду</label><input type="number" class="setting-input" id="settingBansPerTeam" value="3" min="1" max="5"></div>
                 <div class="setting-group"><label class="setting-label">Пиков на команду</label><input type="number" class="setting-input" id="settingPicksPerTeam" value="5" min="3" max="5"></div>
-                <div class="setting-group"><label class="setting-label">Порядок банов (R=Rad, D=Dire)</label><input type="text" class="setting-input" id="settingBanOrder" value="R,D,R,D,R,D"></div>
+                <div class="setting-group"><label class="setting-label">Порядок банов</label><input type="text" class="setting-input" id="settingBanOrder" value="R,D,R,D,R,D"></div>
                 <div class="setting-group"><label class="setting-label">Порядок пиков</label><input type="text" class="setting-input" id="settingPickOrder" value="R,D,D,R,R,D,D,R,R,D"></div>
             </div>
             <div class="modal-footer">
@@ -163,6 +175,11 @@
         <div class="history-header"><span class="history-title">📋 Прошлые пики</span></div>
         <div class="history-scroll" id="historyScroll"><p class="text-muted">Нет завершённых игр</p></div>
     </section>
+    <div class="winner-panel hidden" id="winnerPanel">
+        <span class="winner-info" id="winnerPanelInfo">Кто победил?</span>
+        <button class="btn btn-radiant" id="btnWinRadiant">🏛️ Radiant победил</button>
+        <button class="btn btn-dire" id="btnWinDire">💀 Dire победил</button>
+    </div>
     <footer class="footer-controls">
         <button class="btn btn-glass" id="btnUndo" disabled>↩ Отменить</button>
         <div class="footer-center">
@@ -174,9 +191,33 @@
         </div>
         <button class="btn btn-primary btn-next" id="btnNextGame" disabled>Следующая игра ▶</button>
     </footer>
+
+    <!-- Чат капитанов -->
+    <div class="chat-panel collapsed" id="chatPanel">
+        <div class="chat-header" id="chatHeader">
+            <span class="chat-title">💬 Чат</span>
+            <span class="chat-toggle">▾</span>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+            <input type="text" class="chat-input" id="chatInput" placeholder="Сообщение..." maxlength="200">
+            <button class="btn btn-primary btn-sm" id="btnChatSend">➤</button>
+        </div>
+    </div>
+
+    <!-- Оверлей "Время вышло" -->
+    <div class="timeout-overlay hidden" id="timeoutOverlay">
+        <div class="timeout-card">
+            <div class="timeout-title">⏰ Время вышло!</div>
+            <div class="timeout-avatar" id="timeoutAvatar"></div>
+            <div class="timeout-hero" id="timeoutHero">—</div>
+            <div class="timeout-action" id="timeoutAction">Авто-выбор</div>
+        </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
     <input type="text" id="copyHelper" style="position:absolute;left:-9999px;" aria-hidden="true">
-    <script src="game-logic.js?v=10"></script>
-    <script src="game-render.js?v=10"></script>
+    <script src="game-logic.js?v=11"></script>
+    <script src="game-render.js?v=11"></script>
 </body>
 </html>
