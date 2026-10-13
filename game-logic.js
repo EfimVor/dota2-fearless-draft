@@ -1,4 +1,4 @@
-/* Dota 2 Fearless Draft - Game Logic (v31 - score + sounds + chat + auto-pick animation) */
+/* Dota 2 Fearless Draft - Game Logic (v32 - sounds + auto-pick animation, без счёта и чата) */
 var ALL_HEROES = {
     strength: ["Abaddon","Alchemist","Axe","Bristleback","Centaur Warrunner","Chaos Knight","Dawnbreaker","Doom","Dragon Knight","Earth Spirit","Earthshaker","Elder Titan","Huskar","Kunkka","Legion Commander","Lifestealer","Mars","Night Stalker","Ogre Magi","Omniknight","Primal Beast","Pudge","Sand King","Slardar","Sven","Tidehunter","Timbersaw","Tiny","Treant Protector","Tusk","Underlord","Undying","Wraith King"],
     agility: ["Anti-Mage","Arc Warden","Bloodseeker","Bounty Hunter","Clinkz","Drow Ranger","Ember Spirit","Faceless Void","Gyrocopter","Hoodwink","Juggernaut","Kez","Luna","Medusa","Meepo","Monkey King","Morphling","Muerta","Naga Siren","Nyx Assassin","Phantom Assassin","Phantom Lancer","Razor","Riki","Shadow Fiend","Slark","Sniper","Spectre","Templar Assassin","Terrorblade","Troll Warlord","Ursa","Viper","Weaver"],
@@ -17,7 +17,7 @@ var ws=null,roomCode=null,svCaptains={radiant:null,dire:null},isRemote=false;
 var myTeam=null;
 var pendingNextGame=false;
 
-/* ==================== SOUNDS (Web Audio API) ==================== */
+/* ==================== SOUNDS ==================== */
 var audioCtx=null;
 function initAudio(){
     if(audioCtx)return;
@@ -36,12 +36,10 @@ function playTone(freq,duration,type,volume){
         osc.start();osc.stop(audioCtx.currentTime+duration);
     }catch(e){}
 }
-function playClick(){initAudio();playTone(900,0.06,"square",0.06);}
 function playBan(){initAudio();playTone(180,0.18,"sawtooth",0.09);}
 function playPick(){initAudio();playTone(520,0.12,"sine",0.08);setTimeout(function(){playTone(760,0.12,"sine",0.08);},100);}
 function playTick(){initAudio();playTone(1300,0.05,"square",0.05);}
 function playMyTurn(){initAudio();playTone(440,0.18,"triangle",0.1);setTimeout(function(){playTone(660,0.22,"triangle",0.1);},190);}
-function playVictory(){initAudio();playTone(660,0.15,"sine",0.1);setTimeout(function(){playTone(880,0.15,"sine",0.1);},150);setTimeout(function(){playTone(1320,0.35,"sine",0.1);},300);}
 
 /* ==================== NETWORKING ==================== */
 function connect(){
@@ -63,7 +61,6 @@ function onMsg(e){
         case"CAPTAIN_LEFT":svCaptains[m.team]=null;syncCaps();refresh();break;
         case"STATE_SYNC":svCaptains=m.captains||svCaptains;if(m.state){isRemote=true;loadState(m.state);isRemote=false;refresh();}break;
         case"GAME_ACTION":isRemote=true;remoteAction(m.action);isRemote=false;refresh();break;
-        case"CHAT_MESSAGE":receiveChatMessage(m);break;
         case"TIMER_TICK":if(m.timerData){game.mainTimer=m.timerData.mainTimer;if(m.timerData.reserveTimers)game.reserveTimers=m.timerData.reserveTimers;updateTimerDisplay();}break;
         case"PLAYER_JOINED":toast("Игрок подключился","info");break;
         case"PLAYER_LEFT":toast("Игрок отключился","info");break;
@@ -80,7 +77,6 @@ function remoteAction(a){
         case"undo":undoLocal();break;
         case"new_series":applyNewSeriesLocally(a.serializedState);break;
         case"next_game":startNextGameRemote(a.startingTeam);break;
-        case"winner":applyWinnerLocally(a.team);break;
         case"coin_flip_start":
             game.coinFlipPhase="flipping";game.coinFlipWinner=null;game.coinFlipChosenSide=null;game.coinFlipChosenSideBy=null;game.coinFlipChosenPick=null;game.coinFlipChosenPickBy=null;
             el("coinFlipModal").classList.remove("hidden");
@@ -104,7 +100,7 @@ function setConStatus(s,t){var d=document.querySelector(".conn-dot");var e=el("c
 function createRoom(){send({type:"CREATE_ROOM"});}
 function joinRoom(code){if(!code)code=el("joinRoomInput").value.trim();if(!code||code.length!==6){toast("Введите 6-значный код","error");return;}send({type:"JOIN_ROOM",roomCode:code});var u=new URL(location);u.searchParams.set("room",code);history.replaceState({},"",u);}
 function copyLink(){if(!roomCode)return;var link=location.origin+location.pathname+"?room="+roomCode;navigator.clipboard.writeText(link).then(function(){toast("Ссылка скопирована!","success");}).catch(function(){var h=el("copyHelper");h.value=link;h.select();document.execCommand("copy");toast("Ссылка скопирована!","success");});}
-function leaveRoom(){if(!roomCode){return;}if(!confirm("Выйти из комнаты?"))return;send({type:"LEAVE_ROOM"});resetRoomUI();toast("Вы вышли из комнаты","info");}
+function leaveRoom(){if(!roomCode)return;if(!confirm("Выйти из комнаты?"))return;send({type:"LEAVE_ROOM"});resetRoomUI();toast("Вы вышли из комнаты","info");}
 function resetRoomUI(){
     roomCode=null;svCaptains={radiant:null,dire:null};myTeam=null;pendingNextGame=false;
     game=freshState();
@@ -112,40 +108,10 @@ function resetRoomUI(){
     el("roomCodeDisplay").textContent="—";
     el("btnLeaveRoom").style.display="none";
     el("coinFlipModal").classList.add("hidden");
-    el("chatMessages").innerHTML="";
     var u=new URL(location);u.searchParams.delete("room");history.replaceState({},"",u);
     refresh();
 }
 
-/* ==================== CHAT ==================== */
-function sendChatMessage(){
-    var input=el("chatInput");
-    if(!input)return;
-    var text=input.value.trim();
-    if(!text)return;
-    if(!roomCode){toast("Вы не в комнате","error");return;}
-    send({type:"CHAT_MESSAGE",text:text});
-    input.value="";
-}
-function receiveChatMessage(m){
-    if(!game.chatMessages)game.chatMessages=[];
-    game.chatMessages.push({text:m.text,from:m.from,team:m.team,ts:m.ts});
-    if(game.chatMessages.length>80)game.chatMessages.shift();
-    renderChat();
-    if(!el("chatPanel").classList.contains("collapsed")){
-        var box=el("chatMessages");
-        if(box)box.scrollTop=box.scrollHeight;
-    } else {
-        el("chatPanel").classList.add("has-new");
-    }
-}
-function toggleChat(){
-    var p=el("chatPanel");
-    if(p.classList.contains("collapsed")){p.classList.remove("collapsed");p.classList.remove("has-new");var box=el("chatMessages");if(box)box.scrollTop=box.scrollHeight;}
-    else{p.classList.add("collapsed");}
-}
-
-/* ==================== CAPTAINS ==================== */
 function syncCaps(){
     var rE=el("radiantCaptainEmpty"),rF=el("radiantCaptainFilled"),rN=el("radiantCaptainName");
     var dE=el("direCaptainEmpty"),dF=el("direCaptainFilled"),dN=el("direCaptainName");
@@ -181,10 +147,10 @@ function setOrderByStartingTeam(startingTeam){
     }
 }
 
-function freshState(){return{seriesStarted:false,currentGame:1,availableHeroes:{strength:[],agility:[],intelligence:[],universal:[]},phase:"ban",step:0,currentTurn:"radiant",bans:{radiant:[],dire:[]},picks:{radiant:[],dire:[]},currentGameBans:[],currentGamePicks:[],seriesBannedHeroes:[],seriesHistory:[],radiantScore:0,direScore:0,mainTimer:30,reserveTimers:{radiant:130,dire:130},startingTeam:"radiant",coinFlipPhase:null,coinFlipWinner:null,coinFlipChosenSide:null,coinFlipChosenSideBy:null,coinFlipChosenPick:null,coinFlipChosenPickBy:null,sideAssignment:{radiant:"radiant",dire:"dire"},chatMessages:[],winner:null};}
+function freshState(){return{seriesStarted:false,currentGame:1,availableHeroes:{strength:[],agility:[],intelligence:[],universal:[]},phase:"ban",step:0,currentTurn:"radiant",bans:{radiant:[],dire:[]},picks:{radiant:[],dire:[]},currentGameBans:[],currentGamePicks:[],seriesBannedHeroes:[],seriesHistory:[],mainTimer:30,reserveTimers:{radiant:130,dire:130},startingTeam:"radiant",coinFlipPhase:null,coinFlipWinner:null,coinFlipChosenSide:null,coinFlipChosenSideBy:null,coinFlipChosenPick:null,coinFlipChosenPickBy:null,sideAssignment:{radiant:"radiant",dire:"dire"}};}
 var game=freshState();
-function saveState(){return{seriesStarted:game.seriesStarted,currentGame:game.currentGame,availableHeroes:JSON.parse(JSON.stringify(game.availableHeroes)),phase:game.phase,step:game.step,currentTurn:game.currentTurn,bans:JSON.parse(JSON.stringify(game.bans)),picks:JSON.parse(JSON.stringify(game.picks)),currentGameBans:game.currentGameBans.slice(),currentGamePicks:game.currentGamePicks.slice(),seriesBannedHeroes:game.seriesBannedHeroes.slice(),seriesHistory:JSON.parse(JSON.stringify(game.seriesHistory)),radiantScore:game.radiantScore,direScore:game.direScore,mainTimer:game.mainTimer,reserveTimers:{radiant:game.reserveTimers.radiant,dire:game.reserveTimers.dire},startingTeam:game.startingTeam,coinFlipPhase:game.coinFlipPhase,coinFlipWinner:game.coinFlipWinner,coinFlipChosenSide:game.coinFlipChosenSide,coinFlipChosenSideBy:game.coinFlipChosenSideBy,coinFlipChosenPick:game.coinFlipChosenPick,coinFlipChosenPickBy:game.coinFlipChosenPickBy,sideAssignment:{radiant:game.sideAssignment.radiant,dire:game.sideAssignment.dire},winner:game.winner};}
-function loadState(s){if(!s)return;game.seriesStarted=s.seriesStarted;game.currentGame=s.currentGame;game.availableHeroes=s.availableHeroes;game.phase=s.phase;game.step=s.step;game.currentTurn=s.currentTurn;game.bans=s.bans;game.picks=s.picks;game.currentGameBans=s.currentGameBans||[];game.currentGamePicks=s.currentGamePicks||[];game.seriesBannedHeroes=s.seriesBannedHeroes||[];game.seriesHistory=s.seriesHistory||[];game.radiantScore=s.radiantScore||0;game.direScore=s.direScore||0;game.mainTimer=s.mainTimer!==undefined?s.mainTimer:30;game.reserveTimers=s.reserveTimers||{radiant:130,dire:130};game.startingTeam=s.startingTeam||"radiant";game.coinFlipPhase=s.coinFlipPhase||null;game.coinFlipWinner=s.coinFlipWinner||null;game.coinFlipChosenSide=s.coinFlipChosenSide||null;game.coinFlipChosenSideBy=s.coinFlipChosenSideBy||null;game.coinFlipChosenPick=s.coinFlipChosenPick||null;game.coinFlipChosenPickBy=s.coinFlipChosenPickBy||null;game.sideAssignment=s.sideAssignment||{radiant:"radiant",dire:"dire"};game.winner=s.winner||null;setOrderByStartingTeam(game.startingTeam);}
+function saveState(){return{seriesStarted:game.seriesStarted,currentGame:game.currentGame,availableHeroes:JSON.parse(JSON.stringify(game.availableHeroes)),phase:game.phase,step:game.step,currentTurn:game.currentTurn,bans:JSON.parse(JSON.stringify(game.bans)),picks:JSON.parse(JSON.stringify(game.picks)),currentGameBans:game.currentGameBans.slice(),currentGamePicks:game.currentGamePicks.slice(),seriesBannedHeroes:game.seriesBannedHeroes.slice(),seriesHistory:JSON.parse(JSON.stringify(game.seriesHistory)),mainTimer:game.mainTimer,reserveTimers:{radiant:game.reserveTimers.radiant,dire:game.reserveTimers.dire},startingTeam:game.startingTeam,coinFlipPhase:game.coinFlipPhase,coinFlipWinner:game.coinFlipWinner,coinFlipChosenSide:game.coinFlipChosenSide,coinFlipChosenSideBy:game.coinFlipChosenSideBy,coinFlipChosenPick:game.coinFlipChosenPick,coinFlipChosenPickBy:game.coinFlipChosenPickBy,sideAssignment:{radiant:game.sideAssignment.radiant,dire:game.sideAssignment.dire}};}
+function loadState(s){if(!s)return;game.seriesStarted=s.seriesStarted;game.currentGame=s.currentGame;game.availableHeroes=s.availableHeroes;game.phase=s.phase;game.step=s.step;game.currentTurn=s.currentTurn;game.bans=s.bans;game.picks=s.picks;game.currentGameBans=s.currentGameBans||[];game.currentGamePicks=s.currentGamePicks||[];game.seriesBannedHeroes=s.seriesBannedHeroes||[];game.seriesHistory=s.seriesHistory||[];game.mainTimer=s.mainTimer!==undefined?s.mainTimer:30;game.reserveTimers=s.reserveTimers||{radiant:130,dire:130};game.startingTeam=s.startingTeam||"radiant";game.coinFlipPhase=s.coinFlipPhase||null;game.coinFlipWinner=s.coinFlipWinner||null;game.coinFlipChosenSide=s.coinFlipChosenSide||null;game.coinFlipChosenSideBy=s.coinFlipChosenSideBy||null;game.coinFlipChosenPick=s.coinFlipChosenPick||null;game.coinFlipChosenPickBy=s.coinFlipChosenPickBy||null;game.sideAssignment=s.sideAssignment||{radiant:"radiant",dire:"dire"};setOrderByStartingTeam(game.startingTeam);}
 
 /* ==================== TIMER ==================== */
 var timerInt=null;
@@ -196,11 +162,9 @@ function startTimer(){
     var team=game.currentTurn;
     timerInt=setInterval(function(){
         if(game.phase==="complete"||!isMyTurn()){stopTimer();return;}
-        var prev=game.mainTimer;
         if(game.mainTimer>0)game.mainTimer--;
         else if(game.reserveTimers[team]>0)game.reserveTimers[team]--;
         else{stopTimer();forceRandom(team);return;}
-        // tick sound при <=10 сек
         if(game.mainTimer<=10&&game.mainTimer>0&&game.mainTimer!==lastTickSec){playTick();lastTickSec=game.mainTimer;}
         if(game.mainTimer===0)lastTickSec=-1;
         updateTimerDisplay();
@@ -217,7 +181,7 @@ function forceRandom(team){
     if(isBan){applyBanLocally(pick.hero,pick.attribute,team);broadcast({type:"ban",hero:pick.hero,attribute:pick.attribute,team:team});}
     else{applyPickLocally(pick.hero,pick.attribute,team);broadcast({type:"pick",hero:pick.hero,attribute:pick.attribute,team:team});}
     syncState();
-    showTimeoutOverlay(pick.hero,isBan?pick.attribute:pick.attribute,isBan);
+    showTimeoutOverlay(pick.hero,pick.attribute,isBan);
 }
 function showTimeoutOverlay(hero,attr,isBan){
     var ov=el("timeoutOverlay");
@@ -320,7 +284,6 @@ function doStartWithAssignment(side,assignment){
     game=freshState();
     game.sideAssignment=assignment;game.seriesStarted=true;game.startingTeam=side;game.availableHeroes=genPool();
     game.phase="ban";game.step=0;game.currentTurn=CFG.banOrder[0];
-    game.chatMessages=game.chatMessages||[];
     refresh();broadcast({type:"new_series",startingTeam:side,serializedState:saveState()});syncState();startTimer();
     toast("Новая серия!","success");
 }
@@ -332,37 +295,15 @@ function startNextGameWithAssignment(side,assignment){
     var banned=game.seriesBannedHeroes.slice();
     game.currentGamePicks.forEach(function(p){if(banned.indexOf(p.hero)===-1)banned.push(p.hero);});
     var nextNum=game.currentGame+1;
-    var prevScoreR=game.radiantScore,prevScoreD=game.direScore;
-    var prevChat=game.chatMessages?game.chatMessages.slice():[];
     game=freshState();
     game.sideAssignment=assignment;game.seriesHistory=hist;game.currentGame=nextNum;game.seriesBannedHeroes=banned;game.startingTeam=side;
     game.availableHeroes=genPool();game.phase="ban";game.step=0;game.currentTurn=CFG.banOrder[0];game.seriesStarted=true;
-    game.radiantScore=prevScoreR;game.direScore=prevScoreD;game.chatMessages=prevChat;
     refresh();broadcast({type:"next_game",startingTeam:side});syncState();startTimer();
     toast("Игра "+game.currentGame+" началась!","info");
 }
 
 function applyNewSeriesLocally(s){if(s)loadState(s);refresh();}
 function startNextGameRemote(side){startNextGameWithAssignment(side,game.sideAssignment);}
-
-/* ==================== WINNER ==================== */
-function recordWinner(team){
-    var mySide=getMySide();
-    if(!mySide){toast("Только капитаны могут отметить победителя","error");return;}
-    if(game.phase!=="complete"){toast("Сначала завершите драфт","error");return;}
-    if(game.winner){toast("Победитель уже отмечен","error");return;}
-    applyWinnerLocally(team);
-    broadcast({type:"winner",team:team});
-    syncState();
-}
-function applyWinnerLocally(team){
-    if(game.winner)return;
-    game.winner=team;
-    if(team==="radiant")game.radiantScore++;else game.direScore++;
-    playVictory();
-    refresh();
-    toast((team==="radiant"?"🏛️ Radiant":"💀 Dire")+" победил!","success");
-}
 
 /* ==================== GAME ACTIONS ==================== */
 function banHero(hero,attr){
@@ -399,7 +340,6 @@ function nextGame(){
     var mySide=getMySide();
     if(!mySide){toast("Только капитаны могут перейти дальше","error");return;}
     if(game.phase!=="complete"){toast("Сначала завершите драфт!","error");return;}
-    if(!game.winner){toast("Сначала отметьте победителя","error");return;}
     pendingNextGame=true;
     startCoinFlip();
 }

@@ -80,15 +80,6 @@ const server = http.createServer((req, res) => {
         }));
         return;
     }
-    if (req.method === 'GET' && pathname === '/api/status') {
-        const roomList = [];
-        for (const [code, room] of rooms) {
-            roomList.push({ code, playerCount: room.players.size, radiantCaptain: room.captains.radiant, direCaptain: room.captains.dire });
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ rooms: roomList, totalRooms: rooms.size }));
-        return;
-    }
     let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
     if (!filePath.startsWith(__dirname)) { res.writeHead(403); res.end('Forbidden'); return; }
     fs.stat(filePath, (err, stats) => {
@@ -182,18 +173,6 @@ wss.on('connection', (ws, req) => {
                 broadcastToRoom(currentRoom, { type: 'GAME_ACTION', action: msg.action, captains: currentRoom.captains }, ws);
                 break;
             }
-            case 'CHAT_MESSAGE': {
-                if (!currentRoom) return;
-                const chatMsg = {
-                    type: 'CHAT_MESSAGE',
-                    text: String(msg.text || '').slice(0, 200),
-                    from: ws.captainName || 'Наблюдатель',
-                    team: ws.captainTeam || null,
-                    ts: Date.now()
-                };
-                broadcastToRoom(currentRoom, chatMsg);
-                break;
-            }
             case 'TIMER_SYNC': {
                 if (!currentRoom) return;
                 broadcastToRoom(currentRoom, { type: 'TIMER_TICK', timerData: msg.timerData }, ws);
@@ -223,7 +202,7 @@ setInterval(() => {
     for (const [code, room] of rooms) {
         let hasActive = false;
         for (const ws of room.players) { if (ws.readyState === 1) { hasActive = true; break; } }
-        if (!hasActive && now - room.createdAt > 30 * 60 * 1000) { rooms.delete(code); console.log(`Комната ${code} удалена`); }
+        if (!hasActive && now - room.createdAt > 30 * 60 * 1000) { rooms.delete(code); }
     }
 }, 10 * 60 * 1000);
 
