@@ -75,9 +75,11 @@ function remoteAction(a){
         case"ban":applyBanLocally(a.hero,a.attribute,a.team);break;
         case"pick":applyPickLocally(a.hero,a.attribute,a.team);break;
         case"undo":undoLocal();break;
-        case"new_series":applyNewSeriesLocally(a.serializedState);break;
-        case"next_game":startNextGameRemote(a.startingTeam);break;
+        case"new_series":
+        case"next_game":
+            break;
         case"coin_flip_start":
+            pendingNextGame = !!a.isNext;
             game.coinFlipPhase="flipping";game.coinFlipWinner=null;game.coinFlipChosenSide=null;game.coinFlipChosenSideBy=null;game.coinFlipChosenPick=null;game.coinFlipChosenPickBy=null;
             el("coinFlipModal").classList.remove("hidden");
             renderCoinFlipModal();
@@ -89,9 +91,15 @@ function remoteAction(a){
         case"coin_flip_choice":
             if(a.category==="side"){game.coinFlipChosenSide=a.value;game.coinFlipChosenSideBy=a.by;}
             else{game.coinFlipChosenPick=a.value;game.coinFlipChosenPickBy=a.by;}
-            if(game.coinFlipPhase==="winner_choosing"){game.coinFlipPhase="loser_choosing";renderCoinFlipModal();}
-            else{game.coinFlipPhase="done";finishCoinFlip();}
+            if(game.coinFlipPhase==="winner_choosing"){
+                game.coinFlipPhase="loser_choosing";
+                renderCoinFlipModal();
+            } else {
+                game.coinFlipPhase="done";
+                el("coinFlipModal").classList.add("hidden");
+            }
             break;
+            
     }
 }
 
@@ -225,7 +233,7 @@ function startCoinFlip(){
     game.coinFlipPhase="flipping";game.coinFlipWinner=null;game.coinFlipChosenSide=null;game.coinFlipChosenSideBy=null;game.coinFlipChosenPick=null;game.coinFlipChosenPickBy=null;
     el("coinFlipModal").classList.remove("hidden");
     renderCoinFlipModal();
-    broadcast({type:"coin_flip_start"});
+        broadcast({type:"coin_flip_start", isNext: pendingNextGame});
     setTimeout(function(){
         if(game.coinFlipPhase!=="flipping")return;
         game.coinFlipWinner=Math.random()<0.5?"radiant":"dire";
